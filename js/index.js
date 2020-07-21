@@ -6,8 +6,9 @@ import { hyper } from './graph-utils.js';
 
 
 
-const FORCE_LAYOUT_NODE_REPULSION_STRENGTH = 250;
+const FORCE_LAYOUT_NODE_REPULSION_STRENGTH = 50;
 const FORCE_LAYOUT_ITERATIONS = 1;
+const HYPER_NUM = 6;
 
 let graph;
 let simulation;
@@ -65,9 +66,7 @@ window.addEventListener("resize", function() {
 const container = new PIXI.Container();
 app.stage.addChild(container);
 
-// // Move container to the center
-// container.x = app.screen.width / 2;
-// container.y = app.screen.height / 2;
+// app.ticker.add(ticked);
 
 let colour = (function() {
     let scale = d3.scaleOrdinal(d3.schemeCategory10);
@@ -82,12 +81,17 @@ let colour = (function() {
 let gfxMap = {};
 let linksGfx;
 
+let nodesBuffer;
+
 d3.json("https://gist.githubusercontent.com/mbostock/4062045/raw/5916d145c8c048a6e3086915a6be464467391c62/miserables.json")
 .then(json => {
     graph = JSON.parse(JSON.stringify(json));
 
-    graph = hyper(graph, 3);
+    graph = hyper(graph, HYPER_NUM);
+    console.log(graph);
     console.log(graph.nodes.length + ' nodes, ' + graph.links.length + ' links');
+
+    nodesBuffer = new Float32Array(graph.nodes.length * 2);
 
     linksGfx = new PIXI.Graphics();
     container.addChild(linksGfx);
@@ -113,8 +117,9 @@ d3.json("https://gist.githubusercontent.com/mbostock/4062045/raw/5916d145c8c048a
       importScripts('https://unpkg.com/d3@5.12.0/dist/d3.min.js');
 
       let simulation;
+      let graph;
 
-      function forceLayout({ graph, options }) {
+      function forceLayout(options) {
         const { nodes, links } = graph;
         const { iterations, nodeRepulsionStrength, width, height } = options;
 
@@ -135,14 +140,25 @@ d3.json("https://gist.githubusercontent.com/mbostock/4062045/raw/5916d145c8c048a
           // .stop()
           .tick(iterations);
 
-        return graph;
       };
 
       self.onmessage = event => {
         // console.log('event.data', event.data);
         // const result = forceLayout.apply(undefined, event.data);
-        const result = forceLayout(event.data);
-        postMessage(result);
+
+        if(!graph) graph = event.data.graph;
+
+        forceLayout(event.data.options);
+
+        // Copy over the data to the buffers
+        var nodesBuffer = event.data.nodesBuffer;
+        for(var i = 0; i < graph.nodes.length; i++){
+            var node = graph.nodes[i];
+            nodesBuffer[i * 2 + 0] = node.x;
+            nodesBuffer[i * 2 + 1] = node.y;
+        }
+
+        postMessage({ nodesBuffer }, [nodesBuffer.buffer]);
       }
     `;
 
@@ -155,19 +171,25 @@ d3.json("https://gist.githubusercontent.com/mbostock/4062045/raw/5916d145c8c048a
       // URL.revokeObjectURL(workerUrl);
 
       // console.log(event.data);
-      graph = event.data;
-      ticked();
+      nodesBuffer = event.data.nodesBuffer;
+      // console.log(nodesBuffer);
+      // graph = event.data;
+
+      updateNodesFromBuffer();
 
       // If the worker was faster than the time step (dt seconds), we want to delay the next timestep
       let delay = delta * 1000 - (Date.now() - sendTime);
       if(delay < 0) {
           delay = 0;
       }
+
       setTimeout(sendDataToWorker, delay);
 
     };
 
-    sendDataToWorker();
+    // sendDataToWorker();
+
+    runSimulationWithoutWebworker();
 
 });
 
@@ -188,27 +210,80 @@ function sendDataToWorker() {
         width,
         height,
       },
-    });
+      nodesBuffer,
+    }, [nodesBuffer.buffer]);
+}
+
+function runSimulationWithoutWebworker() {
+  const { nodes, links } = graph;
+  if(!simulation) {
+    simulation = d3.forceSimulation()
+      .alpha(0.25)
+      .alphaDecay(0.005)
+      .alphaTarget(0.025)
+      ;
+
+  }
+  simulation
+    .nodes(nodes)
+    .force("link", d3.forceLink(links).id(d => d.id))
+    .force("charge", d3.forceManyBody().strength(-FORCE_LAYOUT_NODE_REPULSION_STRENGTH))
+    .force('center', d3.forceCenter(width / 2, height / 2))
+    // .stop()
+    .tick(FORCE_LAYOUT_ITERATIONS)
+    .on('tick', ticked);
+
+}
+
+function updateNodesFromBuffer() {
+    // Update nodes from buffer
+    for(var i = 0; i < graph.nodes.length; i++) {
+      const node = graph.nodes[i];
+      var x = nodesBuffer[i * 2 + 0];
+      var y = nodesBuffer[i * 2 + 1];
+      // gfxMap[node.id].position = new PIXI.Point(x, y);
+      gfxMap[node.id].position.x = x;
+      gfxMap[node.id].position.y = y;
+    }
+
+    // graph.nodes.forEach((node) => {
+    //     let { x, y } = node;
+    //     gfxMap[node.id].position = new PIXI.Point(x, y);
+    // });
+
+    // linksGfx.clear();
+    // linksGfx.alpha = 0.6;
+    //
+    // graph.links.forEach((link) => {
+    //     let { source, target } = link;
+    //     linksGfx.lineStyle(Math.sqrt(link.value), 0x999999);
+    //     linksGfx.moveTo(source.x, source.y);
+    //     linksGfx.lineTo(target.x, target.y);
+    // });
+    //
+    // linksGfx.endFill();
+
+    // renderer.render(container);
+
 }
 
 function ticked() {
-
     graph.nodes.forEach((node) => {
         let { x, y } = node;
         gfxMap[node.id].position = new PIXI.Point(x, y);
     });
 
-    linksGfx.clear();
-    linksGfx.alpha = 0.6;
-
-    graph.links.forEach((link) => {
-        let { source, target } = link;
-        linksGfx.lineStyle(Math.sqrt(link.value), 0x999999);
-        linksGfx.moveTo(source.x, source.y);
-        linksGfx.lineTo(target.x, target.y);
-    });
-
-    linksGfx.endFill();
+    // linksGfx.clear();
+    // linksGfx.alpha = 0.6;
+    //
+    // graph.links.forEach((link) => {
+    //     let { source, target } = link;
+    //     linksGfx.lineStyle(Math.sqrt(link.value), 0x999999);
+    //     linksGfx.moveTo(source.x, source.y);
+    //     linksGfx.lineTo(target.x, target.y);
+    // });
+    //
+    // linksGfx.endFill();
 
     // renderer.render(container);
 
