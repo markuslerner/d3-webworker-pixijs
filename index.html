@@ -18,8 +18,10 @@
 
         let stage = new PIXI.Container();
         let linksGfx;
+
         let renderer = PIXI.autoDetectRenderer(width, height,
-            {antialias: !0, transparent: !0, resolution: 1});
+            { antialias: true, transparent: true, resolution: window.devicePixelRatio });
+        renderer.view.style.width = `${width}px`;
 
         document.body.appendChild(renderer.view);
 
