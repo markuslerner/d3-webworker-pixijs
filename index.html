@@ -9,20 +9,22 @@
     </head>
     <body>
         <script src="https://cdn.polyfill.io/v2/polyfill.min.js?features=default"></script>
-        <script src="https://d3js.org/d3.v4.min.js"></script>
+        <script src="https://d3js.org/d3.v5.min.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/4.3.2/pixi.min.js"></script>
         <script>
 
+        let graph;
         let width = 960, height = 600;
 
         let stage = new PIXI.Container();
+        let linksGfx;
         let renderer = PIXI.autoDetectRenderer(width, height,
             {antialias: !0, transparent: !0, resolution: 1});
 
         document.body.appendChild(renderer.view);
 
         let colour = (function() {
-            let scale = d3.scaleOrdinal(d3.schemeCategory20);
+            let scale = d3.scaleOrdinal(d3.schemeCategory10);
             return (num) => parseInt(scale(num).slice(1), 16);
         })();
 
@@ -31,10 +33,12 @@
             .force('charge', d3.forceManyBody())
             .force('center', d3.forceCenter(width / 2, height / 2));
 
-        d3.json("miserables.json", function(error, graph) {
+        (async function() {
+          try {
+            graph = await d3.json("https://gist.githubusercontent.com/mbostock/4062045/raw/5916d145c8c048a6e3086915a6be464467391c62/miserables.json");
 
-            let links = new PIXI.Graphics();
-            stage.addChild(links);
+            linksGfx = new PIXI.Graphics();
+            stage.addChild(linksGfx);
 
             graph.nodes.forEach((node) => {
                 node.gfx = new PIXI.Graphics();
@@ -52,7 +56,6 @@
                     .on('drag', dragged)
                     .on('end', dragended));
 
-
             simulation
                 .nodes(graph.nodes)
                 .on('tick', ticked);
@@ -60,29 +63,33 @@
             simulation.force('link')
                   .links(graph.links);
 
-          function ticked() {
-
-              graph.nodes.forEach((node) => {
-                  let { x, y, gfx } = node;
-                  gfx.position = new PIXI.Point(x, y);
-              });
-
-              links.clear();
-              links.alpha = 0.6;
-
-              graph.links.forEach((link) => {
-                  let { source, target } = link;
-                  links.lineStyle(Math.sqrt(link.value), 0x999999);
-                  links.moveTo(source.x, source.y);
-                  links.lineTo(target.x, target.y);
-              });
-
-              links.endFill();
-
-              renderer.render(stage);
-
+          } catch(error) {
+            console.log(error);
           }
-        });
+        })();
+
+        function ticked() {
+
+            graph.nodes.forEach((node) => {
+                let { x, y, gfx } = node;
+                gfx.position = new PIXI.Point(x, y);
+            });
+
+            linksGfx.clear();
+            linksGfx.alpha = 0.6;
+
+            graph.links.forEach((link) => {
+                let { source, target } = link;
+                linksGfx.lineStyle(Math.sqrt(link.value), 0x999999);
+                linksGfx.moveTo(source.x, source.y);
+                linksGfx.lineTo(target.x, target.y);
+            });
+
+            linksGfx.endFill();
+
+            renderer.render(stage);
+
+        }
 
         function dragstarted() {
             if (!d3.event.active) simulation.alphaTarget(0.3).restart();
@@ -100,6 +107,7 @@
             d3.event.subject.fx = null;
             d3.event.subject.fy = null;
         }
+
         </script>
     </body>
 </html>
