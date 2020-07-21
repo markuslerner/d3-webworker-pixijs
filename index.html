@@ -14,9 +14,13 @@
         <script>
 
         const FORCE_LAYOUT_NODE_REPULSION_STRENGTH = 250;
-        const FORCE_LAYOUT_ITERATIONS = 300;
+        const FORCE_LAYOUT_ITERATIONS = 1;
 
         let graph;
+        let simulation;
+        let worker;
+        let sendTime; // Time when we sent last message
+        let delta = 1 / 60;
         let width = 960, height = 600;
 
         let stage = new PIXI.Container();
@@ -71,109 +75,81 @@
             // simulation.force('link')
             //       .links(graph.links);
 
-            // static force-directed layout, running in WebWorker thread
-            (async function() {
-              graph = await forceLayout(graph, {
-                iterations: FORCE_LAYOUT_ITERATIONS,
-                nodeRepulsionStrength: FORCE_LAYOUT_NODE_REPULSION_STRENGTH,
-              });
-              ticked();
-              // nodes.forEach(nodeData => {
-              //   nodeData.x += width / 2;
-              //   nodeData.y += height / 2;
-              // });
-            })();
-
-
-            // const workerCode = `
-            //   importScripts('https://unpkg.com/d3@5.12.0/dist/d3.min.js');
-            //
-            //   function forceLayout(data) {
-            //     console.log(data);
-            //
-            //     const nodes = data.nodes;
-            //     const links = data.links;
-            //
-            //     const iterations = 300;
-            //     const nodeRepulsionStrength = 250;
-            //
-            //     // d3.forceSimulation(nodes)
-            //     //   .force("link", d3.forceLink(links).id(linkData => linkData.id))
-            //     //   .force("charge", d3.forceManyBody().strength(-nodeRepulsionStrength))
-            //     //   .force("center", d3.forceCenter())
-            //     //   .stop()
-            //     //   .tick(iterations);
-            //
-            //     return { nodes, links };
-            //   };
-            //
-            //   self.onmessage = event => {
-            //     console.log('event.data', event.data);
-            //
-            //     // const result = forceLayout.apply(undefined, event.data);
-            //     const result = forceLayout(event.data);
-            //     postMessage(result);
-            //   }
-            // `;
-            //
-            // const workerBlob = new Blob([workerCode], { type: 'application/javascript' });
-            // const workerUrl = URL.createObjectURL(workerBlob)
-            // const worker = new Worker(workerUrl);
-            //
-            // worker.onmessage = event => {
-            //   // resolve(event.data);
-            //   // worker.terminate();
-            //   // URL.revokeObjectURL(workerUrl);
-            //
-            //   console.log(event.data);
-            //
-            // };
-            //
-            // worker.postMessage(graph);
-
-        });
-
-        forceLayout = (...args) => {
-          return new Promise(resolve => {
             const workerCode = `
               importScripts('https://unpkg.com/d3@5.12.0/dist/d3.min.js');
 
-              function forceLayout(data, options = {}) {
-                const nodes = data.nodes;
-                const links = data.links;
+              let simulation;
 
-                const iterations = options.iterations;
-                const nodeRepulsionStrength = options.nodeRepulsionStrength;
+              function forceLayout({ graph, options }) {
+                const { nodes, links } = graph;
+                const { iterations, nodeRepulsionStrength, width, height } = options;
 
-                d3.forceSimulation(nodes)
-                  .force("link", d3.forceLink(links).id(linkData => linkData.id))
+                if(!simulation) {
+                  simulation = d3.forceSimulation();
+                }
+
+                simulation
+                  .nodes(nodes)
+                  .force("link", d3.forceLink(links).id(d => d.id))
                   .force("charge", d3.forceManyBody().strength(-nodeRepulsionStrength))
-                  .force("center", d3.forceCenter())
-                  .stop()
+                  .force('center', d3.forceCenter(width / 2, height / 2))
+                  // .stop()
                   .tick(iterations);
 
-                return { nodes, links };
+                return graph;
               };
 
               self.onmessage = event => {
-                const result = forceLayout.apply(undefined, event.data);
-                // const result = forceLayout(event.data);
+                // console.log('event.data', event.data);
+                // const result = forceLayout.apply(undefined, event.data);
+                const result = forceLayout(event.data);
                 postMessage(result);
               }
             `;
 
             const workerBlob = new Blob([workerCode], { type: 'application/javascript' });
             const workerUrl = URL.createObjectURL(workerBlob)
-            const worker = new Worker(workerUrl);
+            worker = new Worker(workerUrl);
 
             worker.onmessage = event => {
-              resolve(event.data);
-              worker.terminate();
-              URL.revokeObjectURL(workerUrl);
+              // worker.terminate();
+              // URL.revokeObjectURL(workerUrl);
+
+              // console.log(event.data);
+              graph = event.data;
+              ticked();
+
+              // If the worker was faster than the time step (dt seconds), we want to delay the next timestep
+              let delay = delta * 1000 - (Date.now() - sendTime);
+              if(delay < 0) {
+                  delay = 0;
+              }
+              setTimeout(sendDataToWorker, delay);
+
             };
 
-            worker.postMessage(args);
-          });
+            sendDataToWorker();
+
+        });
+
+        function sendDataToWorker() {
+            sendTime = Date.now();
+            // worker.postMessage({
+            //     N : N,
+            //     dt : dt,
+            //     cannonUrl : document.location.href.replace(/\/[^/]*$/,"/") + "../build/cannon.js",
+            //     positions : positions,
+            //     quaternions : quaternions
+            // },[positions.buffer, quaternions.buffer]);
+            worker.postMessage({
+              graph,
+              options: {
+                iterations: FORCE_LAYOUT_ITERATIONS,
+                nodeRepulsionStrength: FORCE_LAYOUT_NODE_REPULSION_STRENGTH,
+                width,
+                height,
+              },
+            });
         }
 
         function ticked() {
@@ -200,7 +176,7 @@
         }
 
         function dragstarted() {
-            if (!d3.event.active) simulation.alphaTarget(0.3).restart();
+            // if (!d3.event.active) simulation.alphaTarget(0.3).restart();
             d3.event.subject.fx = d3.event.subject.x;
             d3.event.subject.fy = d3.event.subject.y;
         }
@@ -211,7 +187,7 @@
         }
 
         function dragended() {
-            if (!d3.event.active) simulation.alphaTarget(0);
+            // if (!d3.event.active) simulation.alphaTarget(0);
             d3.event.subject.fx = null;
             d3.event.subject.fy = null;
         }
