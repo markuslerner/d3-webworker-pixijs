@@ -73,7 +73,10 @@
 
             // static force-directed layout, running in WebWorker thread
             (async function() {
-              graph = await forceLayout(graph);
+              graph = await forceLayout(graph, {
+                iterations: FORCE_LAYOUT_ITERATIONS,
+                nodeRepulsionStrength: FORCE_LAYOUT_NODE_REPULSION_STRENGTH,
+              });
               ticked();
               // nodes.forEach(nodeData => {
               //   nodeData.x += width / 2;
@@ -130,17 +133,17 @@
 
         });
 
-        forceLayout = (data) => {
+        forceLayout = (...args) => {
           return new Promise(resolve => {
             const workerCode = `
               importScripts('https://unpkg.com/d3@5.12.0/dist/d3.min.js');
 
-              function forceLayout(data) {
+              function forceLayout(data, options = {}) {
                 const nodes = data.nodes;
                 const links = data.links;
 
-                const iterations = 300;
-                const nodeRepulsionStrength = 150;
+                const iterations = options.iterations;
+                const nodeRepulsionStrength = options.nodeRepulsionStrength;
 
                 d3.forceSimulation(nodes)
                   .force("link", d3.forceLink(links).id(linkData => linkData.id))
@@ -153,8 +156,8 @@
               };
 
               self.onmessage = event => {
-                // const result = forceLayout.apply(undefined, event.data);
-                const result = forceLayout(event.data);
+                const result = forceLayout.apply(undefined, event.data);
+                // const result = forceLayout(event.data);
                 postMessage(result);
               }
             `;
@@ -169,8 +172,7 @@
               URL.revokeObjectURL(workerUrl);
             };
 
-            console.log(data);
-            worker.postMessage(data);
+            worker.postMessage(args);
           });
         }
 
