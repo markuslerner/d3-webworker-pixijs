@@ -14,7 +14,8 @@ let simulation;
 let worker;
 let sendTime; // Time when we sent last message
 let delta = 1 / 60;
-let width = 960, height = 600;
+let width = window.innerWidth;
+let height = window.innerHeight;
 
 const stats = new Stats();
 document.body.appendChild( stats.dom );
@@ -36,14 +37,37 @@ function render() { // time
 requestAnimationFrame(render);
 
 
-let stage = new PIXI.Container();
-let linksGfx;
+// let stage = new PIXI.Container();
+// let renderer = PIXI.autoDetectRenderer(width, height,
+//     { antialias: true, transparent: true, resolution: window.devicePixelRatio });
+// renderer.view.style.width = `${width}px`;
+//
+// document.body.appendChild(renderer.view);
 
-let renderer = PIXI.autoDetectRenderer(width, height,
-    { antialias: true, transparent: true, resolution: window.devicePixelRatio });
-renderer.view.style.width = `${width}px`;
+const app = new PIXI.Application({
+  width,
+  height,
+  antialias: true,
+  backgroundColor: 0x000000,
+  resolution: window.devicePixelRatio || 1,
+  autoStart: true,
+  autoDensity: true,
+});
+// app.renderer.autoResize = true;
+document.body.appendChild(app.view);
 
-document.body.appendChild(renderer.view);
+window.addEventListener("resize", function() {
+  width = window.innerWidth;
+  height = window.innerHeight;
+  app.renderer.resize(width, height);
+});
+
+const container = new PIXI.Container();
+app.stage.addChild(container);
+
+// // Move container to the center
+// container.x = app.screen.width / 2;
+// container.y = app.screen.height / 2;
 
 let colour = (function() {
     let scale = d3.scaleOrdinal(d3.schemeCategory10);
@@ -56,6 +80,7 @@ let colour = (function() {
 //     .force('center', d3.forceCenter(width / 2, height / 2));
 
 let gfxMap = {};
+let linksGfx;
 
 d3.json("https://gist.githubusercontent.com/mbostock/4062045/raw/5916d145c8c048a6e3086915a6be464467391c62/miserables.json")
 .then(json => {
@@ -65,24 +90,24 @@ d3.json("https://gist.githubusercontent.com/mbostock/4062045/raw/5916d145c8c048a
     console.log(graph.nodes.length + ' nodes, ' + graph.links.length + ' links');
 
     linksGfx = new PIXI.Graphics();
-    stage.addChild(linksGfx);
+    container.addChild(linksGfx);
 
     graph.nodes.forEach((node) => {
       const gfx = new PIXI.Graphics();
       gfx.lineStyle(1.5, 0xFFFFFF);
       gfx.beginFill(colour(node.group));
       gfx.drawCircle(0, 0, 5);
-      stage.addChild(gfx);
+      container.addChild(gfx);
       gfxMap[node.id] = gfx;
     });
 
-    d3.select(renderer.view)
-        .call(d3.drag()
-            .container(renderer.view)
-            .subject(() => simulation.find(d3.event.x, d3.event.y))
-            .on('start', dragstarted)
-            .on('drag', dragged)
-            .on('end', dragended));
+    // d3.select(renderer.view)
+    //     .call(d3.drag()
+    //         .container(renderer.view)
+    //         .subject(() => simulation.find(d3.event.x, d3.event.y))
+    //         .on('start', dragstarted)
+    //         .on('drag', dragged)
+    //         .on('end', dragended));
 
     const workerCode = `
       importScripts('https://unpkg.com/d3@5.12.0/dist/d3.min.js');
@@ -185,7 +210,7 @@ function ticked() {
 
     linksGfx.endFill();
 
-    renderer.render(stage);
+    // renderer.render(container);
 
 }
 
