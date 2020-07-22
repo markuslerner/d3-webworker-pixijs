@@ -4,7 +4,7 @@
 
 import Stats from 'https://unpkg.com/stats.js@0.17.0/src/Stats.js';
 
-// import {GUI} from 'https://unpkg.com/dat.gui@0.7.7/build/dat.gui.module.js';
+import {GUI} from 'https://unpkg.com/dat.gui@0.7.7/build/dat.gui.module.js';
 
 import SmoothFollow from './SmoothFollow.js';
 
@@ -13,14 +13,17 @@ import { hyper, multiply } from './graph-utils.js';
 
 
 const USE_WEB_WORKER = true;
-const INTERPOLATE_POSITIONS = true;
 const FORCE_LAYOUT_NODE_REPULSION_STRENGTH = 10;
 const FORCE_LAYOUT_ITERATIONS = 1;
 const MULTIPLY = 1;
-const HYPER = 6;
+const HYPER = 1;
 const NODE_RADIUS = 5;
 const NODE_HIT_WIDTH = 5;
 const NODE_HIT_RADIUS = NODE_RADIUS + NODE_HIT_WIDTH;
+
+const params = {
+  interpolatePositions: true,
+};
 
 const gfxIDMap = {}; // store references to node graphics by node id
 const gfxMap = new WeakMap(); // store references to node graphics by node
@@ -64,6 +67,14 @@ if(USE_WEB_WORKER) {
   workerStats.dom.style.bottom = '0px';
 }
 
+const gui = new GUI();
+// gui.close();
+
+gui.add(params, 'interpolatePositions', false).name('interpolate');
+// gui.addColor(params, 'color1').onChange(function() {
+//   uniforms.color1.value = new THREE.Color(params.color1);
+// });
+
 const app = new PIXI.Application({
   width,
   height,
@@ -92,9 +103,7 @@ app.ticker.add(() => {
   renderStats.begin();
 });
 
-if(INTERPOLATE_POSITIONS) {
-  app.ticker.add(updateInterpolatedPositions);
-}
+app.ticker.add(updateInterpolatedPositions);
 
 // app.ticker.add(drawLines);
 
@@ -322,7 +331,7 @@ function updateNodesFromBuffer() {
       const gfx = gfxIDMap[node.id];
       // gfx.position = new PIXI.Point(x, y);
 
-      if(INTERPOLATE_POSITIONS) {
+      if(params.interpolatePositions) {
         gfx.smoothFollowX.set(node.x = nodesBuffer[i * 2 + 0]);
         gfx.smoothFollowY.set(node.y = nodesBuffer[i * 2 + 1]);
       } else {
@@ -371,7 +380,7 @@ function updatePositionsFromSimulation() { // only when not using web worker
         const gfx = gfxMap.get(node);
         // const gfx = gfxIDMap[node.id];
         // gfx.position = new PIXI.Point(x, y);
-        if(INTERPOLATE_POSITIONS) {
+        if(params.interpolatePositions) {
           gfx.smoothFollowX.set(node.x);
           gfx.smoothFollowY.set(node.y);
         } else {
@@ -388,7 +397,7 @@ function updatePositionsFromSimulation() { // only when not using web worker
     //     const target = gfxIDMap[link.target.id];
     //
     //     linksGfx.lineStyle(Math.sqrt(link.value), 0x999999);
-    //     if(INTERPOLATE_POSITIONS) {
+    //     if(params.interpolatePositions) {
     //       linksGfx.moveTo(source.smoothFollowX.valueSmooth, source.smoothFollowY.valueSmooth);
     //       linksGfx.lineTo(target.smoothFollowX.valueSmooth, target.smoothFollowY.valueSmooth);
     //     } else {
@@ -404,7 +413,7 @@ function updatePositionsFromSimulation() { // only when not using web worker
 }
 
 function updateInterpolatedPositions() {
-  if(!graph) return;
+  if(!graph || !params.interpolatePositions) return;
 
   // stats.begin();
 
@@ -484,7 +493,7 @@ function onDragMove() {
 
 function onDragEnd() {
   if(draggingNode) {
-    if(INTERPOLATE_POSITIONS) {
+    if(params.interpolatePositions) {
       this.smoothFollowX.reset(this.position.x);
       this.smoothFollowY.reset(this.position.y);
     }
