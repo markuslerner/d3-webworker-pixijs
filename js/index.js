@@ -35,13 +35,34 @@ let width = window.innerWidth;
 let height = window.innerHeight;
 let nodesBuffer;
 let draggingNode;
+let workerStats;
 
-const stats = new Stats();
-document.body.appendChild( stats.dom );
-stats.dom.style.left = 'auto';
-stats.dom.style.right = '0px';
-stats.dom.style.top = 'auto';
-stats.dom.style.bottom = '0px';
+// var node = document.createElement("div");
+// node.appendChild( document.createTextNode("Water") );
+
+const renderStats = new Stats();
+document.body.appendChild(renderStats.dom);
+var title = document.createElement("div");
+title.className = 'title';
+title.appendChild(document.createTextNode("Renderer"));
+renderStats.dom.insertBefore(title, renderStats.dom.childNodes[0]);
+renderStats.dom.style.left = '0px';
+renderStats.dom.style.right = 'auto';
+renderStats.dom.style.top = 'auto';
+renderStats.dom.style.bottom = '0px';
+
+if(USE_WEB_WORKER) {
+  workerStats = new Stats();
+  document.body.appendChild( workerStats.dom );
+  var title = document.createElement("div");
+  title.appendChild(document.createTextNode("Worker"));
+  title.className = 'title';
+  workerStats.dom.insertBefore(title, workerStats.dom.childNodes[0]);
+  workerStats.dom.style.left = 'auto';
+  workerStats.dom.style.right = '0px';
+  workerStats.dom.style.top = 'auto';
+  workerStats.dom.style.bottom = '0px';
+}
 
 const app = new PIXI.Application({
   width,
@@ -67,8 +88,8 @@ const linksGfx = new PIXI.Graphics();
 container.addChild(linksGfx);
 
 app.ticker.add(() => {
-  stats.begin();
-  stats.end();
+  renderStats.end();
+  renderStats.begin();
 });
 
 if(INTERPOLATE_POSITIONS) {
@@ -118,6 +139,7 @@ d3.json("https://gist.githubusercontent.com/mbostock/4062045/raw/5916d145c8c048a
       console.log('Using web worker');
 
       nodesBuffer = new Float32Array(graph.nodes.length * 2);
+      // nodesBuffer = new Float32Array(new SharedArrayBuffer(graph.nodes.length * 2 * 4));
 
       const workerCode = `
         importScripts('https://unpkg.com/d3@5.12.0/dist/d3.min.js');
@@ -292,48 +314,51 @@ function runSimulationWithoutWebworker() {
 }
 
 function updateNodesFromBuffer() {
-    // Update nodes from buffer
-    for(var i = 0; i < graph.nodes.length; i++) {
-      const node = graph.nodes[i];
-      if(draggingNode !== node) {
-        // const gfx = gfxMap.get(node);
-        const gfx = gfxIDMap[node.id];
-        // gfx.position = new PIXI.Point(x, y);
+  // Update nodes from buffer
+  for(var i = 0; i < graph.nodes.length; i++) {
+    const node = graph.nodes[i];
+    if(draggingNode !== node) {
+      // const gfx = gfxMap.get(node);
+      const gfx = gfxIDMap[node.id];
+      // gfx.position = new PIXI.Point(x, y);
 
-        if(INTERPOLATE_POSITIONS) {
-          gfx.smoothFollowX.set(node.x = nodesBuffer[i * 2 + 0]);
-          gfx.smoothFollowY.set(node.y = nodesBuffer[i * 2 + 1]);
-        } else {
-          gfx.position.x = node.x = nodesBuffer[i * 2 + 0];
-          gfx.position.y = node.y = nodesBuffer[i * 2 + 1];
-        }
-
+      if(INTERPOLATE_POSITIONS) {
+        gfx.smoothFollowX.set(node.x = nodesBuffer[i * 2 + 0]);
+        gfx.smoothFollowY.set(node.y = nodesBuffer[i * 2 + 1]);
+      } else {
+        gfx.position.x = node.x = nodesBuffer[i * 2 + 0];
+        gfx.position.y = node.y = nodesBuffer[i * 2 + 1];
       }
+
     }
+  }
 
-    // graph.nodes.forEach((node) => {
-    //     let { x, y } = node;
-    //     gfxIDMap[node.id].position = new PIXI.Point(x, y);
-    // });
+  // graph.nodes.forEach((node) => {
+  //     let { x, y } = node;
+  //     gfxIDMap[node.id].position = new PIXI.Point(x, y);
+  // });
 
-    // linksGfx.clear();
-    // linksGfx.alpha = 0.6;
-    //
-    // graph.links.forEach((link) => {
-    //   const source = gfxIDMap[link.source];
-    //   const target = gfxIDMap[link.target];
-    //
-    //   if(source && target) {
-    //     linksGfx.lineStyle(Math.sqrt(link.value), 0x999999);
-    //     linksGfx.moveTo(source.x, source.y);
-    //     linksGfx.lineTo(target.x, target.y);
-    //   }
-    //
-    // });
-    //
-    // linksGfx.endFill();
-    //
-    // // app.renderer.render(container);
+  // linksGfx.clear();
+  // linksGfx.alpha = 0.6;
+  //
+  // graph.links.forEach((link) => {
+  //   const source = gfxIDMap[link.source];
+  //   const target = gfxIDMap[link.target];
+  //
+  //   if(source && target) {
+  //     linksGfx.lineStyle(Math.sqrt(link.value), 0x999999);
+  //     linksGfx.moveTo(source.x, source.y);
+  //     linksGfx.lineTo(target.x, target.y);
+  //   }
+  //
+  // });
+  //
+  // linksGfx.endFill();
+  //
+  // // app.renderer.render(container);
+
+  workerStats.end();
+  workerStats.begin();
 
 }
 
