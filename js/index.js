@@ -171,10 +171,6 @@ d3.json("https://gist.githubusercontent.com/mbostock/4062045/raw/5916d145c8c048a
       console.log('Using web worker');
       // Create main thread simulation just in order to set link sources and targets:
 
-      simulation = d3.forceSimulation()
-        .nodes(graph.nodes)
-        .force('link', d3.forceLink(graph.links).id(d => d.id))
-        .stop();
       sendDataToWorker(true);
 
     } else {
@@ -250,10 +246,15 @@ function updateNodesFromBuffer() {
     linksGfx.alpha = 0.6;
 
     graph.links.forEach((link) => {
-        let { source, target } = link;
+      const source = gfxMap[link.source];
+      const target = gfxMap[link.target];
+
+      if(source && target) {
         linksGfx.lineStyle(Math.sqrt(link.value), 0x999999);
         linksGfx.moveTo(source.x, source.y);
         linksGfx.lineTo(target.x, target.y);
+      }
+
     });
 
     linksGfx.endFill();
