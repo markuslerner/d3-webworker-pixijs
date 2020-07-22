@@ -1,3 +1,7 @@
+// Based on:
+// https://bl.ocks.org/kirjavascript/dcafa2b3a53cbcc9c5de19b938b92119
+// https://observablehq.com/@zakjan/force-directed-graph-pixi
+
 import Stats from 'https://unpkg.com/stats.js@0.17.0/src/Stats.js';
 
 // import {GUI} from 'https://unpkg.com/dat.gui@0.7.7/build/dat.gui.module.js';
@@ -10,10 +14,14 @@ const USE_WEB_WORKER = true;
 const FORCE_LAYOUT_NODE_REPULSION_STRENGTH = 10;
 const FORCE_LAYOUT_ITERATIONS = 1;
 const MULTIPLY = 1;
-const HYPER = 4;
+const HYPER = 1;
+const NODE_RADIUS = 5;
+const NODE_HIT_WIDTH = 5;
+const NODE_HIT_RADIUS = NODE_RADIUS + NODE_HIT_WIDTH;
 
 const gfxIDMap = {}; // store references to node graphics by node id
 const gfxMap = new WeakMap(); // store references to node graphics by node
+const nodeMap = new WeakMap(); // store references to nodes by node graphics
 
 let graph;
 let simulation; // simulation when not using web worker
@@ -23,6 +31,7 @@ let delta = 1 / 60;
 let width = window.innerWidth;
 let height = window.innerHeight;
 let nodesBuffer;
+let draggingNode;
 
 const stats = new Stats();
 document.body.appendChild( stats.dom );
@@ -77,10 +86,20 @@ d3.json("https://gist.githubusercontent.com/mbostock/4062045/raw/5916d145c8c048a
       const gfx = new PIXI.Graphics();
       gfx.lineStyle(1.5, 0xFFFFFF);
       gfx.beginFill(colour(node.group));
-      gfx.drawCircle(0, 0, 5);
+      gfx.drawCircle(0, 0, NODE_RADIUS);
+      gfx.interactive = true;
+      gfx.buttonMode = true;
+      gfx.dragging = false;
+      gfx.hitArea = new PIXI.Circle(0, 0, NODE_HIT_RADIUS);
+      gfx.on('pointerdown', onDragStart);
+      gfx.on('pointerup', onDragEnd);
+      gfx.on('pointerupoutside', onDragEnd);
+      gfx.on('pointermove', onDragMove);
+
       container.addChild(gfx);
       gfxIDMap[node.id] = gfx;
       gfxMap.set(node, gfx);
+      nodeMap.set(gfx, node);
     });
 
     // d3.select(renderer.view)
@@ -104,7 +123,7 @@ d3.json("https://gist.githubusercontent.com/mbostock/4062045/raw/5916d145c8c048a
         if(!simulation) {
           simulation = d3.forceSimulation()
             .alpha(0.25)
-            .alphaDecay(0.005)
+            .alphaDecay(0.05)
             .alphaTarget(0.025)
             .nodes(nodes)
             .force("link", d3.forceLink(links).id(d => d.id))
@@ -231,13 +250,15 @@ function updateNodesFromBuffer() {
     // Update nodes from buffer
     for(var i = 0; i < graph.nodes.length; i++) {
       const node = graph.nodes[i];
-      node.x = nodesBuffer[i * 2 + 0];
-      node.y = nodesBuffer[i * 2 + 1];
-      // const gfx = gfxMap.get(node);
-      const gfx = gfxIDMap[node.id];
-      // gfx.position = new PIXI.Point(x, y);
-      gfx.position.x = node.x;
-      gfx.position.y = node.y;
+      if(draggingNode !== node) {
+        node.x = nodesBuffer[i * 2 + 0];
+        node.y = nodesBuffer[i * 2 + 1];
+        // const gfx = gfxMap.get(node);
+        const gfx = gfxIDMap[node.id];
+        // gfx.position = new PIXI.Point(x, y);
+        gfx.position.x = node.x;
+        gfx.position.y = node.y;
+      }
     }
 
     // graph.nodes.forEach((node) => {
@@ -312,3 +333,75 @@ function dragended() {
   d3.event.subject.fx = null;
   d3.event.subject.fy = null;
 }
+
+const moveNode = (nodeData, point) => {
+  const gfx = gfxMap.get(nodeData);
+
+  gfx.x = nodeData.x = point.x;
+  gfx.y = nodeData.y = point.y;
+
+  // updatePositions();
+};
+
+// const appMouseMove = event => {
+//   if (!draggingNode) {
+//     return;
+//   }
+//
+//   // moveNode(draggingNode, viewport.toWorld(event.data.global));
+//   moveNode(draggingNode, event.data.global);
+// };
+
+function onDragStart(event) {
+  draggingNode = nodeMap.get(event.currentTarget);
+
+  this.data = event.data;
+  this.alpha = 0.5;
+  this.dragging = true;
+
+  this.dragOffset = this.data.getLocalPosition(this.parent);
+  this.dragOffset.x -= this.position.x;
+  this.dragOffset.y -= this.position.y;
+
+  // enable node dragging
+  // app.renderer.plugins.interaction.on('mousemove', appMouseMove);
+
+  // disable viewport dragging
+  // viewport.pause = true;
+}
+
+function onDragMove() {
+  if(this.dragging && draggingNode) {
+      const newPosition = this.data.getLocalPosition(this.parent);
+      draggingNode.fx = this.x = newPosition.x - this.dragOffset.x;
+      draggingNode.fy = this.y = newPosition.y - this.dragOffset.y;
+  }
+}
+
+function onDragEnd() {
+  if(draggingNode) {
+    // Update buffer from nodes
+    // for(var i = 0; i < graph.nodes.length; i++) {
+    //   const node = graph.nodes[i];
+    //   // if(draggingNode === node) {
+    //     nodesBuffer[i * 2 + 0] = node.fx;
+    //     nodesBuffer[i * 2 + 1] = node.fy;
+    //   // }
+    // }
+
+    draggingNode.fx = null;
+    draggingNode.fy = null;
+  }
+
+  draggingNode = undefined;
+
+  this.alpha = 1;
+  this.dragging = false;
+  // set the interaction data to null
+  this.data = null;
+
+  // disable node dragging
+  // app.renderer.plugins.interaction.off('mousemove', appMouseMove);
+  // enable viewport dragging
+  // viewport.pause = false;
+};
