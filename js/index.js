@@ -8,7 +8,7 @@ import {GUI} from 'https://unpkg.com/dat.gui@0.7.7/build/dat.gui.module.js';
 
 import SmoothFollow from './SmoothFollow.js';
 
-import { hyper, multiply } from './graph-utils.js';
+import { createRandomGraph, hyper, multiply } from './graph-utils.js';
 
 
 
@@ -120,43 +120,59 @@ const colour = (function() {
     return (num) => parseInt(scale(num).slice(1), 16);
 })();
 
-d3.json("https://gist.githubusercontent.com/mbostock/4062045/raw/5916d145c8c048a6e3086915a6be464467391c62/miserables.json")
-.then(json => {
-    graph = JSON.parse(JSON.stringify(json));
+// d3.json("https://gist.githubusercontent.com/mbostock/4062045/raw/5916d145c8c048a6e3086915a6be464467391c62/miserables.json")
+// .then(json => {
+//     graph = JSON.parse(JSON.stringify(json));
+//
+//     console.log('Original graph: ' + graph.nodes.length + ' nodes, ' + graph.links.length + ' links');
+//     console.log(graph);
+//
+//     graph = hyper(multiply(graph, MULTIPLY), HYPER);
+//     console.log('multiply: ' + MULTIPLY + ', hyper: ' + HYPER);
+//     console.log(graph.nodes.length + ' nodes, ' + graph.links.length + ' links');
+//
+//     createPixiGraphics();
+//
+//     createWebworker();
+//
+//     createMainThreadSimulation();
+//
+// });
 
-    console.log('Original graph: ' + graph.nodes.length + ' nodes, ' + graph.links.length + ' links');
+graph = createRandomGraph(10, 2);
 
-    graph = hyper(multiply(graph, MULTIPLY), HYPER);
-    console.log('multiply: ' + MULTIPLY + ', hyper: ' + HYPER);
-    console.log(graph.nodes.length + ' nodes, ' + graph.links.length + ' links');
+console.log(graph);
 
-    graph.nodes.forEach((node) => {
-      const gfx = new PIXI.Graphics();
-      gfx.lineStyle(1.5, 0xFFFFFF);
-      gfx.beginFill(colour(node.group));
-      gfx.drawCircle(0, 0, NODE_RADIUS);
-      gfx.interactive = true;
-      gfx.buttonMode = true;
-      gfx.dragging = false;
-      gfx.hitArea = new PIXI.Circle(0, 0, NODE_HIT_RADIUS);
-      gfx.on('pointerdown', onDragStart);
-      gfx.on('pointerup', onDragEnd);
-      gfx.on('pointerupoutside', onDragEnd);
-      gfx.on('pointermove', onDragMove);
-      gfx.smoothFollowX = new SmoothFollow();
-      gfx.smoothFollowY = new SmoothFollow();
+createPixiGraphics();
 
-      container.addChild(gfx);
-      gfxIDMap[node.id] = gfx;
-      gfxMap.set(node, gfx);
-      nodeMap.set(gfx, node);
-    });
+createWebworker();
 
-    createWebworker();
+createMainThreadSimulation();
 
-    createMainThreadSimulation();
 
-});
+function createPixiGraphics() {
+  graph.nodes.forEach((node) => {
+    const gfx = new PIXI.Graphics();
+    gfx.lineStyle(1.5, 0xFFFFFF);
+    gfx.beginFill(colour(node.group));
+    gfx.drawCircle(0, 0, NODE_RADIUS);
+    gfx.interactive = true;
+    gfx.buttonMode = true;
+    gfx.dragging = false;
+    gfx.hitArea = new PIXI.Circle(0, 0, NODE_HIT_RADIUS);
+    gfx.on('pointerdown', onDragStart);
+    gfx.on('pointerup', onDragEnd);
+    gfx.on('pointerupoutside', onDragEnd);
+    gfx.on('pointermove', onDragMove);
+    gfx.smoothFollowX = new SmoothFollow();
+    gfx.smoothFollowY = new SmoothFollow();
+
+    container.addChild(gfx);
+    gfxIDMap[node.id] = gfx;
+    gfxMap.set(node, gfx);
+    nodeMap.set(gfx, node);
+  });
+}
 
 function createWebworker() {
   console.log('Create web worker');
