@@ -12,13 +12,17 @@ const FORCE_LAYOUT_ITERATIONS = 1;
 const MULTIPLY = 1;
 const HYPER = 4;
 
+const gfxIDMap = {}; // store references to node graphics by node id
+const gfxMap = new WeakMap(); // store references to node graphics by node
+
 let graph;
-let simulation;
-let worker;
+let simulation; // simulation when not using web worker
+let worker; // web worker
 let sendTime; // Time when we sent last message
 let delta = 1 / 60;
 let width = window.innerWidth;
 let height = window.innerHeight;
+let nodesBuffer;
 
 const stats = new Stats();
 document.body.appendChild( stats.dom );
@@ -36,7 +40,6 @@ const app = new PIXI.Application({
   autoStart: true,
   autoDensity: true,
 });
-// app.renderer.autoResize = true;
 document.body.appendChild(app.view);
 
 window.addEventListener("resize", function() {
@@ -48,17 +51,15 @@ window.addEventListener("resize", function() {
 const container = new PIXI.Container();
 app.stage.addChild(container);
 
+const linksGfx = new PIXI.Graphics();
+container.addChild(linksGfx);
+
 // app.ticker.add(ticked);
 
-let colour = (function() {
-    let scale = d3.scaleOrdinal(d3.schemeCategory10);
+const colour = (function() {
+    const scale = d3.scaleOrdinal(d3.schemeCategory10);
     return (num) => parseInt(scale(num).slice(1), 16);
 })();
-
-let gfxMap = {};
-let linksGfx;
-
-let nodesBuffer;
 
 d3.json("https://gist.githubusercontent.com/mbostock/4062045/raw/5916d145c8c048a6e3086915a6be464467391c62/miserables.json")
 .then(json => {
@@ -72,16 +73,14 @@ d3.json("https://gist.githubusercontent.com/mbostock/4062045/raw/5916d145c8c048a
 
     nodesBuffer = new Float32Array(graph.nodes.length * 2);
 
-    linksGfx = new PIXI.Graphics();
-    container.addChild(linksGfx);
-
     graph.nodes.forEach((node) => {
       const gfx = new PIXI.Graphics();
       gfx.lineStyle(1.5, 0xFFFFFF);
       gfx.beginFill(colour(node.group));
       gfx.drawCircle(0, 0, 5);
       container.addChild(gfx);
-      gfxMap[node.id] = gfx;
+      gfxIDMap[node.id] = gfx;
+      gfxMap.set(node, gfx);
     });
 
     // d3.select(renderer.view)
@@ -218,9 +217,11 @@ function runSimulationWithoutWebworker() {
     .force("link", d3.forceLink(links).id(d => d.id))
     .force("charge", d3.forceManyBody().strength(-FORCE_LAYOUT_NODE_REPULSION_STRENGTH))
     .force('center', d3.forceCenter(width / 2, height / 2))
-    // .stop()
     .tick(FORCE_LAYOUT_ITERATIONS)
-    .on('tick', ticked);
+    .on('tick', ticked)
+    // .stop()
+    ;
+
 
 }
 
@@ -232,22 +233,24 @@ function updateNodesFromBuffer() {
       const node = graph.nodes[i];
       node.x = nodesBuffer[i * 2 + 0];
       node.y = nodesBuffer[i * 2 + 1];
-      // gfxMap[node.id].position = new PIXI.Point(x, y);
-      gfxMap[node.id].position.x = node.x;
-      gfxMap[node.id].position.y = node.y;
+      // const gfx = gfxMap.get(node);
+      const gfx = gfxIDMap[node.id];
+      // gfx.position = new PIXI.Point(x, y);
+      gfx.position.x = node.x;
+      gfx.position.y = node.y;
     }
 
     // graph.nodes.forEach((node) => {
     //     let { x, y } = node;
-    //     gfxMap[node.id].position = new PIXI.Point(x, y);
+    //     gfxIDMap[node.id].position = new PIXI.Point(x, y);
     // });
 
     linksGfx.clear();
     linksGfx.alpha = 0.6;
 
     graph.links.forEach((link) => {
-      const source = gfxMap[link.source];
-      const target = gfxMap[link.target];
+      const source = gfxIDMap[link.source];
+      const target = gfxIDMap[link.target];
 
       if(source && target) {
         linksGfx.lineStyle(Math.sqrt(link.value), 0x999999);
@@ -267,23 +270,28 @@ function updateNodesFromBuffer() {
 function ticked() {
   stats.begin();
 
+  if(graph) {
+    graph.nodes.forEach((node) => {
+        let { x, y } = node;
+        const gfx = gfxMap.get(node);
+        // const gfx = gfxIDMap[node.id];
+        // gfx.position = new PIXI.Point(x, y);
+        gfx.position.x = node.x;
+        gfx.position.y = node.y;
+    });
 
-  graph.nodes.forEach((node) => {
-      let { x, y } = node;
-      gfxMap[node.id].position = new PIXI.Point(x, y);
-  });
+    linksGfx.clear();
+    linksGfx.alpha = 0.6;
 
-  linksGfx.clear();
-  linksGfx.alpha = 0.6;
+    graph.links.forEach((link) => {
+        let { source, target } = link;
+        linksGfx.lineStyle(Math.sqrt(link.value), 0x999999);
+        linksGfx.moveTo(source.x, source.y);
+        linksGfx.lineTo(target.x, target.y);
+    });
 
-  graph.links.forEach((link) => {
-      let { source, target } = link;
-      linksGfx.lineStyle(Math.sqrt(link.value), 0x999999);
-      linksGfx.moveTo(source.x, source.y);
-      linksGfx.lineTo(target.x, target.y);
-  });
-
-  linksGfx.endFill();
+    linksGfx.endFill();
+  }
 
   stats.end();
 }
