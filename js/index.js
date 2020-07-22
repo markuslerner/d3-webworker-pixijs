@@ -12,17 +12,18 @@ import { hyper, multiply } from './graph-utils.js';
 
 
 
-const USE_WEB_WORKER = true;
 const FORCE_LAYOUT_NODE_REPULSION_STRENGTH = 10;
 const FORCE_LAYOUT_ITERATIONS = 1;
 const MULTIPLY = 1;
-const HYPER = 1;
+const HYPER = 6;
 const NODE_RADIUS = 5;
 const NODE_HIT_WIDTH = 5;
 const NODE_HIT_RADIUS = NODE_RADIUS + NODE_HIT_WIDTH;
 
 const params = {
+  useWebWorker: true,
   interpolatePositions: true,
+  drawLines: false,
 };
 
 const gfxIDMap = {}; // store references to node graphics by node id
@@ -54,26 +55,32 @@ renderStats.dom.style.right = 'auto';
 renderStats.dom.style.top = 'auto';
 renderStats.dom.style.bottom = '0px';
 
-if(USE_WEB_WORKER) {
-  workerStats = new Stats();
-  document.body.appendChild( workerStats.dom );
-  var title = document.createElement("div");
-  title.appendChild(document.createTextNode("Worker"));
-  title.className = 'title';
-  workerStats.dom.insertBefore(title, workerStats.dom.childNodes[0]);
-  workerStats.dom.style.left = 'auto';
-  workerStats.dom.style.right = '0px';
-  workerStats.dom.style.top = 'auto';
-  workerStats.dom.style.bottom = '0px';
-}
+workerStats = new Stats();
+document.body.appendChild( workerStats.dom );
+var title = document.createElement("div");
+title.appendChild(document.createTextNode("Worker"));
+title.className = 'title';
+workerStats.dom.insertBefore(title, workerStats.dom.childNodes[0]);
+workerStats.dom.style.left = 'auto';
+workerStats.dom.style.right = '0px';
+workerStats.dom.style.top = 'auto';
+workerStats.dom.style.bottom = '0px';
+workerStats.dom.style.display = params.useWebWorker ? 'block' : 'none';
 
 const gui = new GUI();
 // gui.close();
 
-gui.add(params, 'interpolatePositions', false).name('interpolate');
-// gui.addColor(params, 'color1').onChange(function() {
-//   uniforms.color1.value = new THREE.Color(params.color1);
-// });
+gui.add(params, 'useWebWorker').name('use WebWorker').onChange(function() {
+  if(params.useWebWorker) {
+    updateNodesFromBuffer();
+    simulation.stop();
+  } else {
+    simulation.restart();
+  }
+  workerStats.dom.style.display = params.useWebWorker ? 'block' : 'none';
+});
+gui.add(params, 'interpolatePositions').name('interpolate');
+gui.add(params, 'drawLines').name('draw lines');
 
 const app = new PIXI.Application({
   width,
@@ -96,6 +103,7 @@ const container = new PIXI.Container();
 app.stage.addChild(container);
 
 const linksGfx = new PIXI.Graphics();
+linksGfx.alpha = 0.6;
 container.addChild(linksGfx);
 
 app.ticker.add(() => {
@@ -105,7 +113,7 @@ app.ticker.add(() => {
 
 app.ticker.add(updateInterpolatedPositions);
 
-// app.ticker.add(drawLines);
+app.ticker.add(drawLines);
 
 const colour = (function() {
     const scale = d3.scaleOrdinal(d3.schemeCategory10);
@@ -144,122 +152,117 @@ d3.json("https://gist.githubusercontent.com/mbostock/4062045/raw/5916d145c8c048a
       nodeMap.set(gfx, node);
     });
 
-    if(USE_WEB_WORKER) {
-      console.log('Using web worker');
+    createWebworker();
 
-      nodesBuffer = new Float32Array(graph.nodes.length * 2);
-      // nodesBuffer = new Float32Array(new SharedArrayBuffer(graph.nodes.length * 2 * 4));
-
-      const workerCode = `
-        importScripts('https://unpkg.com/d3@5.12.0/dist/d3.min.js');
-
-        let simulation;
-        let graph;
-
-        function copyDataToBuffers(nodesBuffer) {
-          // Copy over the data to the buffers
-          for(var i = 0; i < graph.nodes.length; i++){
-              var node = graph.nodes[i];
-              nodesBuffer[i * 2 + 0] = node.x;
-              nodesBuffer[i * 2 + 1] = node.y;
-          }
-
-          postMessage({ type: 'updateMainBuffers', nodesBuffer }, [nodesBuffer.buffer]);
-        }
-
-        self.onmessage = event => {
-          // console.log('event.data', event.data);
-          // const result = forceLayout.apply(undefined, event.data);
-
-          if(!graph) graph = event.data.graph;
-
-          const { options, type } = event.data;
-          // console.log(type);
-
-          const { nodes, links } = graph;
-
-          if(type === 'createSimulation') {
-            if(!simulation) {
-              simulation = d3.forceSimulation()
-                .alpha(0.25)
-                .alphaDecay(0.005)
-                .alphaTarget(0.025)
-                .nodes(nodes)
-                .force("link", d3.forceLink(links).id(d => d.id))
-                ;
-
-            }
-
-            copyDataToBuffers(event.data.nodesBuffer);
-
-          } else if(type === 'updateWorkerNodes') {
-            const { nodes } = event.data;
-
-            const n = simulation.nodes();
-            for(var i = 0; i < n.length; i++){
-                n[i].x = nodes[i].x;
-                n[i].y = nodes[i].y;
-            }
-
-          } else {
-            if(simulation) {
-              const { iterations, nodeRepulsionStrength, width, height } = options;
-
-              simulation
-                .force("charge", d3.forceManyBody().strength(-nodeRepulsionStrength))
-                .force('center', d3.forceCenter(width / 2, height / 2))
-                .stop()
-                .tick(iterations)
-                ;
-            }
-
-            copyDataToBuffers(event.data.nodesBuffer);
-
-          }
-
-        }
-      `;
-
-      const workerBlob = new Blob([workerCode], { type: 'application/javascript' });
-      const workerUrl = URL.createObjectURL(workerBlob)
-      worker = new Worker(workerUrl);
-
-      worker.onmessage = event => {
-        // worker.terminate();
-        // URL.revokeObjectURL(workerUrl);
-
-        const { type } = event.data;
-
-        nodesBuffer = event.data.nodesBuffer;
-
-        if(type === 'updateMainBuffers') {
-          // console.log(nodesBuffer);
-          // graph = event.data;
-
-          updateNodesFromBuffer();
-
-          // If the worker was faster than the time step (dt seconds), we want to delay the next timestep
-          let delay = delta * 1000 - (Date.now() - sendTime);
-          if(delay < 0) {
-              delay = 0;
-          }
-          setTimeout(updateWorkerBuffers, delay);
-
-        }
-
-      };
-
-      // Create main thread simulation just in order to set link sources and targets:
-
-      createWorkerSimulation();
-
-    } else {
-      console.log('Using only main thread');
-
-      runSimulationWithoutWebworker();
-    }
+    createMainThreadSimulation();
 
 });
+
+function createWebworker() {
+  console.log('Create web worker');
+
+  nodesBuffer = new Float32Array(graph.nodes.length * 2);
+  // nodesBuffer = new Float32Array(new SharedArrayBuffer(graph.nodes.length * 2 * 4));
+
+  const workerCode = `
+    importScripts('https://unpkg.com/d3@5.12.0/dist/d3.min.js');
+
+    let simulation;
+    let graph;
+
+    function copyDataToBuffers(nodesBuffer) {
+      // Copy over the data to the buffers
+      for(var i = 0; i < graph.nodes.length; i++){
+          var node = graph.nodes[i];
+          nodesBuffer[i * 2 + 0] = node.x;
+          nodesBuffer[i * 2 + 1] = node.y;
+      }
+
+      postMessage({ type: 'updateMainBuffers', nodesBuffer }, [nodesBuffer.buffer]);
+    }
+
+    self.onmessage = event => {
+      // console.log('event.data', event.data);
+      // const result = forceLayout.apply(undefined, event.data);
+
+      if(!graph) graph = event.data.graph;
+
+      const { options, type } = event.data;
+      // console.log(type);
+
+      const { nodes, links } = graph;
+
+      if(type === 'createSimulation') {
+        if(!simulation) {
+          simulation = d3.forceSimulation()
+            .alpha(0.25)
+            .alphaDecay(0.005)
+            .alphaTarget(0.025)
+            .nodes(nodes)
+            .force("link", d3.forceLink(links).id(d => d.id))
+            ;
+
+        }
+
+        copyDataToBuffers(event.data.nodesBuffer);
+
+      } else if(type === 'updateWorkerNodes') {
+        const { nodes } = event.data;
+
+        const n = simulation.nodes();
+        for(var i = 0; i < n.length; i++){
+            n[i].x = nodes[i].x;
+            n[i].y = nodes[i].y;
+        }
+
+      } else {
+        if(simulation) {
+          const { iterations, nodeRepulsionStrength, width, height } = options;
+
+          simulation
+            .force("charge", d3.forceManyBody().strength(-nodeRepulsionStrength))
+            .force('center', d3.forceCenter(width / 2, height / 2))
+            .stop()
+            .tick(iterations)
+            ;
+        }
+
+        copyDataToBuffers(event.data.nodesBuffer);
+
+      }
+
+    }
+  `;
+
+  const workerBlob = new Blob([workerCode], { type: 'application/javascript' });
+  const workerUrl = URL.createObjectURL(workerBlob)
+  worker = new Worker(workerUrl);
+
+  worker.onmessage = event => {
+    // worker.terminate();
+    // URL.revokeObjectURL(workerUrl);
+
+    const { type } = event.data;
+
+    nodesBuffer = event.data.nodesBuffer;
+
+    if(type === 'updateMainBuffers') {
+      // console.log(nodesBuffer);
+      // graph = event.data;
+
+      updateNodesFromBuffer();
+
+    }
+
+  };
+
+  // Create main thread simulation just in order to set link sources and targets:
+
+  if(params.useWebWorker) {
+    createWorkerSimulation();
+  }
+
+}
 
 function createWorkerSimulation() {
     sendTime = Date.now();
@@ -278,17 +281,19 @@ function createWorkerSimulation() {
 }
 
 function updateWorkerBuffers() {
-    sendTime = Date.now();
-    worker.postMessage({
-      type: 'updateWorkerBuffers',
-      options: {
-        iterations: FORCE_LAYOUT_ITERATIONS,
-        nodeRepulsionStrength: FORCE_LAYOUT_NODE_REPULSION_STRENGTH,
-        width,
-        height,
-      },
-      nodesBuffer,
-    }, [nodesBuffer.buffer]);
+  if(!params.useWebWorker) return;
+
+  sendTime = Date.now();
+  worker.postMessage({
+    type: 'updateWorkerBuffers',
+    options: {
+      iterations: FORCE_LAYOUT_ITERATIONS,
+      nodeRepulsionStrength: FORCE_LAYOUT_NODE_REPULSION_STRENGTH,
+      width,
+      height,
+    },
+    nodesBuffer,
+  }, [nodesBuffer.buffer]);
 
 }
 
@@ -300,23 +305,30 @@ function updateWorkerNodes() {
 
 }
 
-function runSimulationWithoutWebworker() {
+function createMainThreadSimulation() {
   const { nodes, links } = graph;
-  if(!simulation) {
-    simulation = d3.forceSimulation()
-      .alpha(0.25)
-      .alphaDecay(0.005)
-      .alphaTarget(0.025)
-      ;
 
-  }
-  simulation
+  simulation = d3.forceSimulation()
     .nodes(nodes)
     .force("link", d3.forceLink(links).id(d => d.id))
+    .alpha(0.25)
+    .alphaDecay(0.005)
+    .alphaTarget(0.025)
+    ;
+
+  if(params.useWebWorker) simulation.stop();
+
+  updateMainThreadSimulation();
+}
+
+function updateMainThreadSimulation() {
+  // const { nodes, links } = graph;
+
+  simulation
     .force("charge", d3.forceManyBody().strength(-FORCE_LAYOUT_NODE_REPULSION_STRENGTH))
     .force('center', d3.forceCenter(width / 2, height / 2))
     .tick(FORCE_LAYOUT_ITERATIONS)
-    .on('tick', updatePositionsFromSimulation)
+    .on('tick', updatePositionsFromMainThreadSimulation)
     // .stop()
     ;
 
@@ -366,13 +378,21 @@ function updateNodesFromBuffer() {
   //
   // // app.renderer.render(container);
 
+  // If the worker was faster than the time step (dt seconds), we want to delay the next timestep
+  let delay = delta * 1000 - (Date.now() - sendTime);
+  if(delay < 0) {
+      delay = 0;
+  }
+  setTimeout(updateWorkerBuffers, delay);
+
   workerStats.end();
   workerStats.begin();
 
 }
 
-function updatePositionsFromSimulation() { // only when not using web worker
+function updatePositionsFromMainThreadSimulation() { // only when not using web worker
   // stats.begin();
+  if(params.useWebWorker) return;
 
   if(graph) {
     graph.nodes.forEach((node) => {
@@ -434,10 +454,9 @@ function updateInterpolatedPositions() {
 }
 
 function drawLines() {
-  if(!graph) return;
-
   linksGfx.clear();
-  linksGfx.alpha = 0.6;
+
+  if(!graph || !params.drawLines) return;
 
   graph.links.forEach((link) => {
     const source = gfxIDMap[link.source.id || link.source];
@@ -498,7 +517,7 @@ function onDragEnd() {
       this.smoothFollowY.reset(this.position.y);
     }
 
-    if(USE_WEB_WORKER) {
+    if(params.useWebWorker) {
       updateWorkerNodes();
     }
 
