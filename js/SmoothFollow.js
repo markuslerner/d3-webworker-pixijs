@@ -17,6 +17,23 @@ export default class SmoothFollow {
     return this;
   }
 
+  set(value) {
+    this.value = value;
+  }
+
+  get() {
+    return this.value;
+  }
+
+  reset(value) {
+    this.value = value;
+    this.valueSmooth = value;
+  }
+
+  getSmooth() {
+    return this.valueSmooth;
+  }
+
   interpolateLinear(value0, value1, pos) {
     return value0 + pos * (value1 - value0);
   }

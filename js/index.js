@@ -12,12 +12,12 @@ import { hyper, multiply } from './graph-utils.js';
 
 
 
-const USE_WEB_WORKER = true;
+const USE_WEB_WORKER = false;
 const INTERPOLATE_POSITIONS = true;
 const FORCE_LAYOUT_NODE_REPULSION_STRENGTH = 10;
 const FORCE_LAYOUT_ITERATIONS = 1;
 const MULTIPLY = 1;
-const HYPER = 6;
+const HYPER = 1;
 const NODE_RADIUS = 5;
 const NODE_HIT_WIDTH = 5;
 const NODE_HIT_RADIUS = NODE_RADIUS + NODE_HIT_WIDTH;
@@ -107,8 +107,8 @@ d3.json("https://gist.githubusercontent.com/mbostock/4062045/raw/5916d145c8c048a
       gfx.on('pointerup', onDragEnd);
       gfx.on('pointerupoutside', onDragEnd);
       gfx.on('pointermove', onDragMove);
-      gfx.smoothFollowX = new SmoothFollow(1.0);
-      gfx.smoothFollowY = new SmoothFollow(1.0);
+      gfx.smoothFollowX = new SmoothFollow();
+      gfx.smoothFollowY = new SmoothFollow();
 
       container.addChild(gfx);
       gfxIDMap[node.id] = gfx;
@@ -301,8 +301,8 @@ function updateNodesFromBuffer() {
         // gfx.position = new PIXI.Point(x, y);
 
         if(INTERPOLATE_POSITIONS) {
-          gfx.smoothFollowX.value = node.x = nodesBuffer[i * 2 + 0];
-          gfx.smoothFollowY.value = node.y = nodesBuffer[i * 2 + 1];
+          gfx.smoothFollowX.set(node.x = nodesBuffer[i * 2 + 0]);
+          gfx.smoothFollowY.set(node.y = nodesBuffer[i * 2 + 1]);
         } else {
           gfx.position.x = node.x = nodesBuffer[i * 2 + 0];
           gfx.position.y = node.y = nodesBuffer[i * 2 + 1];
@@ -347,8 +347,8 @@ function updatePositionsFromSimulation() { // only when not using web worker
         // const gfx = gfxIDMap[node.id];
         // gfx.position = new PIXI.Point(x, y);
         if(INTERPOLATE_POSITIONS) {
-          gfx.smoothFollowX.value = node.x;
-          gfx.smoothFollowY.value = node.y;
+          gfx.smoothFollowX.set(node.x);
+          gfx.smoothFollowY.set(node.y);
         } else {
           gfx.position.x = node.x;
           gfx.position.y = node.y;
@@ -391,8 +391,8 @@ function updateInterpolatedPositions() {
       // gfx.position = new PIXI.Point(x, y);
       gfx.smoothFollowX.loop(delta);
       gfx.smoothFollowY.loop(delta);
-      gfx.position.x = gfx.smoothFollowX.valueSmooth;
-      gfx.position.y = gfx.smoothFollowY.valueSmooth;
+      gfx.position.x = gfx.smoothFollowX.getSmooth();
+      gfx.position.y = gfx.smoothFollowY.getSmooth();
     }
   }
 
@@ -460,8 +460,8 @@ function onDragMove() {
 function onDragEnd() {
   if(draggingNode) {
     if(INTERPOLATE_POSITIONS) {
-      this.smoothFollowX.value = this.smoothFollowX.valueSmooth = this.position.x;
-      this.smoothFollowY.value = this.smoothFollowY.valueSmooth = this.position.y;
+      this.smoothFollowX.reset(this.position.x);
+      this.smoothFollowY.reset(this.position.y);
     }
 
     if(USE_WEB_WORKER) {
