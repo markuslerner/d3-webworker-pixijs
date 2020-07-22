@@ -6,15 +6,18 @@ import Stats from 'https://unpkg.com/stats.js@0.17.0/src/Stats.js';
 
 // import {GUI} from 'https://unpkg.com/dat.gui@0.7.7/build/dat.gui.module.js';
 
+import SmoothFollow from './SmoothFollow.js';
+
 import { hyper, multiply } from './graph-utils.js';
 
 
 
-const USE_WEB_WORKER = false;
+const USE_WEB_WORKER = true;
+const INTERPOLATE_POSITIONS = true;
 const FORCE_LAYOUT_NODE_REPULSION_STRENGTH = 10;
 const FORCE_LAYOUT_ITERATIONS = 1;
 const MULTIPLY = 1;
-const HYPER = 4;
+const HYPER = 7;
 const NODE_RADIUS = 5;
 const NODE_HIT_WIDTH = 5;
 const NODE_HIT_RADIUS = NODE_RADIUS + NODE_HIT_WIDTH;
@@ -63,7 +66,14 @@ app.stage.addChild(container);
 const linksGfx = new PIXI.Graphics();
 container.addChild(linksGfx);
 
-// app.ticker.add(ticked);
+app.ticker.add(() => {
+  stats.begin();
+  stats.end();
+});
+
+if(INTERPOLATE_POSITIONS) {
+  app.ticker.add(updateInterpolatedPositions);
+}
 
 const colour = (function() {
     const scale = d3.scaleOrdinal(d3.schemeCategory10);
@@ -95,6 +105,8 @@ d3.json("https://gist.githubusercontent.com/mbostock/4062045/raw/5916d145c8c048a
       gfx.on('pointerup', onDragEnd);
       gfx.on('pointerupoutside', onDragEnd);
       gfx.on('pointermove', onDragMove);
+      gfx.smoothFollowX = new SmoothFollow(1.0);
+      gfx.smoothFollowY = new SmoothFollow(1.0);
 
       container.addChild(gfx);
       gfxIDMap[node.id] = gfx;
@@ -271,16 +283,13 @@ function runSimulationWithoutWebworker() {
     .force("charge", d3.forceManyBody().strength(-FORCE_LAYOUT_NODE_REPULSION_STRENGTH))
     .force('center', d3.forceCenter(width / 2, height / 2))
     .tick(FORCE_LAYOUT_ITERATIONS)
-    .on('tick', ticked)
+    .on('tick', updatePositionsFromSimulation)
     // .stop()
     ;
-
 
 }
 
 function updateNodesFromBuffer() {
-    stats.begin();
-
     // Update nodes from buffer
     for(var i = 0; i < graph.nodes.length; i++) {
       const node = graph.nodes[i];
@@ -288,8 +297,15 @@ function updateNodesFromBuffer() {
         // const gfx = gfxMap.get(node);
         const gfx = gfxIDMap[node.id];
         // gfx.position = new PIXI.Point(x, y);
-        gfx.position.x = node.x = nodesBuffer[i * 2 + 0];
-        gfx.position.y = node.y = nodesBuffer[i * 2 + 1];
+
+        if(INTERPOLATE_POSITIONS) {
+          gfx.smoothFollowX.value = node.x = nodesBuffer[i * 2 + 0];
+          gfx.smoothFollowY.value = node.y = nodesBuffer[i * 2 + 1];
+        } else {
+          gfx.position.x = node.x = nodesBuffer[i * 2 + 0];
+          gfx.position.y = node.y = nodesBuffer[i * 2 + 1];
+        }
+
       }
     }
 
@@ -298,30 +314,70 @@ function updateNodesFromBuffer() {
     //     gfxIDMap[node.id].position = new PIXI.Point(x, y);
     // });
 
-    linksGfx.clear();
-    linksGfx.alpha = 0.6;
+    // linksGfx.clear();
+    // linksGfx.alpha = 0.6;
+    //
+    // graph.links.forEach((link) => {
+    //   const source = gfxIDMap[link.source];
+    //   const target = gfxIDMap[link.target];
+    //
+    //   if(source && target) {
+    //     linksGfx.lineStyle(Math.sqrt(link.value), 0x999999);
+    //     linksGfx.moveTo(source.x, source.y);
+    //     linksGfx.lineTo(target.x, target.y);
+    //   }
+    //
+    // });
+    //
+    // linksGfx.endFill();
+    //
+    // // app.renderer.render(container);
 
-    graph.links.forEach((link) => {
-      const source = gfxIDMap[link.source];
-      const target = gfxIDMap[link.target];
-
-      if(source && target) {
-        linksGfx.lineStyle(Math.sqrt(link.value), 0x999999);
-        linksGfx.moveTo(source.x, source.y);
-        linksGfx.lineTo(target.x, target.y);
-      }
-
-    });
-
-    linksGfx.endFill();
-
-    // app.renderer.render(container);
-
-    stats.end();
 }
 
-function ticked() {
-  stats.begin();
+function updateInterpolatedPositions() {
+  if(!graph) return;
+
+  // stats.begin();
+
+  for(var i = 0; i < graph.nodes.length; i++) {
+    const node = graph.nodes[i];
+    if(draggingNode !== node) {
+      // const gfx = gfxMap.get(node);
+      const gfx = gfxIDMap[node.id];
+      // gfx.position = new PIXI.Point(x, y);
+      gfx.smoothFollowX.loop(delta);
+      gfx.smoothFollowY.loop(delta);
+      gfx.position.x = gfx.smoothFollowX.valueSmooth;
+      gfx.position.y = gfx.smoothFollowY.valueSmooth;
+    }
+  }
+
+  // linksGfx.clear();
+  // linksGfx.alpha = 0.6;
+  //
+  // graph.links.forEach((link) => {
+  //   const source = gfxIDMap[link.source];
+  //   const target = gfxIDMap[link.target];
+  //
+  //   if(source && target) {
+  //     linksGfx.lineStyle(Math.sqrt(link.value), 0x999999);
+  //     linksGfx.moveTo(source.x, source.y);
+  //     linksGfx.lineTo(target.x, target.y);
+  //   }
+  //
+  // });
+  //
+  // linksGfx.endFill();
+
+  // app.renderer.render(container);
+
+  // stats.end();
+
+}
+
+function updatePositionsFromSimulation() {
+  // stats.begin();
 
   if(graph) {
     graph.nodes.forEach((node) => {
@@ -329,24 +385,36 @@ function ticked() {
         const gfx = gfxMap.get(node);
         // const gfx = gfxIDMap[node.id];
         // gfx.position = new PIXI.Point(x, y);
-        gfx.position.x = node.x;
-        gfx.position.y = node.y;
+        if(INTERPOLATE_POSITIONS) {
+          gfx.smoothFollowX.value = node.x;
+          gfx.smoothFollowY.value = node.y;
+        } else {
+          gfx.position.x = node.x;
+          gfx.position.y = node.y;
+        }
     });
 
-    linksGfx.clear();
-    linksGfx.alpha = 0.6;
-
-    graph.links.forEach((link) => {
-        let { source, target } = link;
-        linksGfx.lineStyle(Math.sqrt(link.value), 0x999999);
-        linksGfx.moveTo(source.x, source.y);
-        linksGfx.lineTo(target.x, target.y);
-    });
-
-    linksGfx.endFill();
+    // linksGfx.clear();
+    // linksGfx.alpha = 0.6;
+    //
+    // graph.links.forEach((link) => {
+    //     const source = gfxIDMap[link.source.id];
+    //     const target = gfxIDMap[link.target.id];
+    //
+    //     linksGfx.lineStyle(Math.sqrt(link.value), 0x999999);
+    //     if(INTERPOLATE_POSITIONS) {
+    //       linksGfx.moveTo(source.smoothFollowX.valueSmooth, source.smoothFollowY.valueSmooth);
+    //       linksGfx.lineTo(target.smoothFollowX.valueSmooth, target.smoothFollowY.valueSmooth);
+    //     } else {
+    //       linksGfx.moveTo(source.x, source.y);
+    //       linksGfx.lineTo(target.x, target.y);
+    //     }
+    // });
+    //
+    // linksGfx.endFill();
   }
 
-  stats.end();
+  // stats.end();
 }
 
 const moveNode = (nodeData, point) => {
@@ -355,7 +423,6 @@ const moveNode = (nodeData, point) => {
   gfx.x = nodeData.x = point.x;
   gfx.y = nodeData.y = point.y;
 
-  // updatePositions();
 };
 
 function onDragStart(event) {
