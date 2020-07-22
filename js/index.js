@@ -12,12 +12,12 @@ import { hyper, multiply } from './graph-utils.js';
 
 
 
-const USE_WEB_WORKER = false;
+const USE_WEB_WORKER = true;
 const INTERPOLATE_POSITIONS = true;
 const FORCE_LAYOUT_NODE_REPULSION_STRENGTH = 10;
 const FORCE_LAYOUT_ITERATIONS = 1;
 const MULTIPLY = 1;
-const HYPER = 1;
+const HYPER = 7;
 const NODE_RADIUS = 5;
 const NODE_HIT_WIDTH = 5;
 const NODE_HIT_RADIUS = NODE_RADIUS + NODE_HIT_WIDTH;
@@ -92,8 +92,6 @@ d3.json("https://gist.githubusercontent.com/mbostock/4062045/raw/5916d145c8c048a
     console.log('multiply: ' + MULTIPLY + ', hyper: ' + HYPER);
     console.log(graph.nodes.length + ' nodes, ' + graph.links.length + ' links');
 
-    nodesBuffer = new Float32Array(graph.nodes.length * 2);
-
     graph.nodes.forEach((node) => {
       const gfx = new PIXI.Graphics();
       gfx.lineStyle(1.5, 0xFFFFFF);
@@ -118,6 +116,8 @@ d3.json("https://gist.githubusercontent.com/mbostock/4062045/raw/5916d145c8c048a
 
     if(USE_WEB_WORKER) {
       console.log('Using web worker');
+
+      nodesBuffer = new Float32Array(graph.nodes.length * 2);
 
       const workerCode = `
         importScripts('https://unpkg.com/d3@5.12.0/dist/d3.min.js');
