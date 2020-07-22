@@ -15,7 +15,7 @@ import { createRandomGraph, hyper, multiply } from './graph-utils.js';
 const FORCE_LAYOUT_NODE_REPULSION_STRENGTH = 10;
 const FORCE_LAYOUT_ITERATIONS = 1;
 const MULTIPLY = 1;
-const HYPER = 6;
+const HYPER = 5;
 const NODE_RADIUS = 5;
 const NODE_HIT_WIDTH = 5;
 const NODE_HIT_RADIUS = NODE_RADIUS + NODE_HIT_WIDTH;
@@ -23,7 +23,7 @@ const NODE_HIT_RADIUS = NODE_RADIUS + NODE_HIT_WIDTH;
 const params = {
   useWebWorker: true,
   interpolatePositions: true,
-  drawLines: false,
+  drawLines: true,
 };
 
 const gfxIDMap = {}; // store references to node graphics by node id
@@ -139,9 +139,7 @@ const colour = (function() {
 //
 // });
 
-graph = createRandomGraph(10, 2);
-
-console.log(graph);
+graph = createRandomGraph(2000, 10000);
 
 createPixiGraphics();
 

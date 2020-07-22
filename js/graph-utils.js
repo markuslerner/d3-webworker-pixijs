@@ -4,22 +4,49 @@
 
 
 
-export const createRandomGraph = (n, m) => { //creates a random graph on n nodes and m links
+export const createRandomGraph = (numNodes, numLinks) => { //creates a random graph on n nodes and m links
   // var nodes = d3.range(n).map(Object);
 
-  var nodes = d3.range(n).map((n) => {
+  var nodes = d3.range(numNodes).map((n) => {
     return {
-      id: n,
+      id: 'node' + n,
     }
   });
   // var list  = randomChoose(unorderedPairs(d3.range(n)), m);
   // var links = list.map(function (a) { return {source: a[0], target: a[1]} });
   var links = [];
-  // for(var i = 0; i < m; i++) {
-  //   links.push({ source: randomChoose(nodes, 1)[0].id, target: randomChoose(nodes, 1)[0].id, value: 0 });
-  // }
+  if(nodes.length > 1) {
+    for(var i = 0; i < numLinks; i++) {
+      const elements = getRandomArrayElements(nodes, 2);
+      links.push({ source: elements[0].id, target: elements[1].id, value: getRandomIndex(10) });
+    }
+  }
 
   return { nodes, links };
+};
+
+export function getRandomArrayElements(arr, numMax) {
+  var shuffled = arr.slice(0);
+  var i = arr.length;
+  var min = Math.max(0, i - numMax);
+  var temp;
+  var index;
+  while(i-- > min) {
+    index = Math.floor((i + 1) * Math.random());
+    temp = shuffled[index];
+    shuffled[index] = shuffled[i];
+    shuffled[i] = temp;
+  }
+  return shuffled.slice(min);
+};
+
+// const ids = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+// const ids = [1, 2, 3];
+// console.log(getRandomArrayElements(ids, 5));
+
+
+export function getRandomIndex(length) {
+  return Math.round(Math.random() * (length - 1));
 };
 
 const randomChoose = (s, k) => { // returns a random k element subset of s
