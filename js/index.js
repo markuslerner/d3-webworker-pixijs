@@ -24,11 +24,13 @@ const params = {
   useWebWorker: true,
   interpolatePositions: true,
   drawLines: true,
+  numNodes: 2000,
+  numLinks: 2000,
 };
 
-const gfxIDMap = {}; // store references to node graphics by node id
-const gfxMap = new WeakMap(); // store references to node graphics by node
-const nodeMap = new WeakMap(); // store references to nodes by node graphics
+let gfxIDMap = {}; // store references to node graphics by node id
+let gfxMap = new WeakMap(); // store references to node graphics by node
+let nodeMap = new WeakMap(); // store references to nodes by node graphics
 
 let graph;
 let simulation; // simulation when not using web worker
@@ -70,6 +72,8 @@ workerStats.dom.style.display = params.useWebWorker ? 'block' : 'none';
 const gui = new GUI();
 // gui.close();
 
+gui.add(params, 'numNodes', 1, 10000).name('num nodes').onChange(updateNodesAndLinks);
+gui.add(params, 'numLinks', 1, 10000).name('num links').onChange(updateNodesAndLinks);
 gui.add(params, 'useWebWorker').name('use WebWorker').onChange(function() {
   if(params.useWebWorker) {
     updateNodesFromBuffer();
@@ -139,7 +143,7 @@ const colour = (function() {
 //
 // });
 
-graph = createRandomGraph(2000, 10000);
+createGraph();
 
 createPixiGraphics();
 
@@ -147,6 +151,33 @@ createWebworker();
 
 createMainThreadSimulation();
 
+
+function updateNodesAndLinks() {
+  graph.nodes.forEach(node => {
+    const gfx = gfxIDMap[node.id];
+    container.removeChild(gfx);
+    gfx.destroy();
+  });
+  gfxIDMap = [];
+  gfxMap = new WeakMap();
+  nodeMap = new WeakMap();
+
+  createGraph();
+
+  createPixiGraphics();
+
+  nodesBuffer = new Float32Array(graph.nodes.length * 2);
+
+  updateWorkerGraph();
+
+  simulation.nodes(graph.nodes);
+  simulation.force("link", d3.forceLink(graph.links).id(d => d.id));
+
+}
+
+function createGraph() {
+  graph = createRandomGraph(params.numNodes, params.numLinks);
+}
 
 function createPixiGraphics() {
   graph.nodes.forEach((node) => {
@@ -173,7 +204,7 @@ function createPixiGraphics() {
 }
 
 function createWebworker() {
-  console.log('Create web worker');
+  // console.log('Create web worker');
 
   nodesBuffer = new Float32Array(graph.nodes.length * 2);
   // nodesBuffer = new Float32Array(new SharedArrayBuffer(graph.nodes.length * 2 * 4));
@@ -214,13 +245,21 @@ function createWebworker() {
             .alphaTarget(0.025)
             .nodes(nodes)
             .force("link", d3.forceLink(links).id(d => d.id))
+            .stop()
             ;
 
         }
 
         copyDataToBuffers(event.data.nodesBuffer);
 
-      } else if(type === 'updateWorkerNodes') {
+      } else if(type === 'updateWorkerGraph') {
+        graph = event.data.graph;
+        simulation
+          .nodes(graph.nodes)
+          .force("link", d3.forceLink(graph.links).id(d => d.id))
+        ;
+
+      } else if(type === 'updateWorkerNodePositions') {
         const { nodes } = event.data;
 
         const n = simulation.nodes();
@@ -229,14 +268,13 @@ function createWebworker() {
             n[i].y = nodes[i].y;
         }
 
-      } else {
+      } else if(type === 'updateWorkerBuffers') {
         if(simulation) {
           const { iterations, nodeRepulsionStrength, width, height } = options;
 
           simulation
             .force("charge", d3.forceManyBody().strength(-nodeRepulsionStrength))
             .force('center', d3.forceCenter(width / 2, height / 2))
-            .stop()
             .tick(iterations)
             ;
         }
@@ -270,11 +308,7 @@ function createWebworker() {
 
   };
 
-  // Create main thread simulation just in order to set link sources and targets:
-
-  if(params.useWebWorker) {
-    createWorkerSimulation();
-  }
+  createWorkerSimulation();
 
 }
 
@@ -311,9 +345,17 @@ function updateWorkerBuffers() {
 
 }
 
-function updateWorkerNodes() {
+function updateWorkerGraph() {
   worker.postMessage({
-    type: 'updateWorkerNodes',
+    type: 'updateWorkerGraph',
+    graph,
+  });
+
+}
+
+function updateWorkerNodePositions() {
+  worker.postMessage({
+    type: 'updateWorkerNodePositions',
     nodes: graph.nodes,
   });
 
@@ -333,6 +375,7 @@ function createMainThreadSimulation() {
   if(params.useWebWorker) simulation.stop();
 
   updateMainThreadSimulation();
+
 }
 
 function updateMainThreadSimulation() {
@@ -532,7 +575,7 @@ function onDragEnd() {
     }
 
     if(params.useWebWorker) {
-      updateWorkerNodes();
+      updateWorkerNodePositions();
     }
 
     draggingNode.fx = null;
