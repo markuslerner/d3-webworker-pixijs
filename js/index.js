@@ -168,26 +168,24 @@ d3.json("https://gist.githubusercontent.com/mbostock/4062045/raw/5916d145c8c048a
     };
 
     if(USE_WEB_WORKER) {
-      // Use web worker:
+      console.log('Using web worker');
       // Create main thread simulation just in order to set link sources and targets:
 
       simulation = d3.forceSimulation()
         .nodes(graph.nodes)
         .force('link', d3.forceLink(graph.links).id(d => d.id))
         .stop();
-      sendDataToWorker();
+      sendDataToWorker(true);
 
     } else {
-      // Use only main thread:
+      console.log('Using only main thread');
 
       runSimulationWithoutWebworker();
     }
 
 });
 
-let graphSent = false;
-
-function sendDataToWorker() {
+function sendDataToWorker(sendGraph = false) {
     sendTime = Date.now();
     // worker.postMessage({
     //     N : N,
@@ -197,7 +195,7 @@ function sendDataToWorker() {
     //     quaternions : quaternions
     // },[positions.buffer, quaternions.buffer]);
     worker.postMessage({
-      graph: graphSent ? null : graph,
+      graph: sendGraph ? graph : null,
       options: {
         iterations: FORCE_LAYOUT_ITERATIONS,
         nodeRepulsionStrength: FORCE_LAYOUT_NODE_REPULSION_STRENGTH,
@@ -207,7 +205,6 @@ function sendDataToWorker() {
       nodesBuffer,
     }, [nodesBuffer.buffer]);
 
-    graphSent = true;
 }
 
 function runSimulationWithoutWebworker() {
