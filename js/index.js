@@ -21,13 +21,13 @@ const ALPHA_DECAY = 0.01;
 const ALPHA_TARGET = 0.05;
 
 const params = {
-  useWebWorker: true,
-  interpolatePositions: true,
-  drawLines: false,
   numNodes: 5000,
   numLinks: 5000,
   numInterations: 1,
+  useWebWorker: true,
   pauseSimulation: false,
+  interpolatePositions: true,
+  drawLines: false,
 };
 
 let renderer, stage, container, linksGfx;
@@ -87,8 +87,8 @@ function createGUI() {
   const gui = new GUI();
   // gui.close();
 
-  gui.add(params, 'numNodes', 1, 50000).name('num nodes').onChange(updateNodesAndLinks);
-  gui.add(params, 'numLinks', 1, 50000).name('num links').onChange(updateNodesAndLinks);
+  gui.add(params, 'numNodes', 1, 20000).name('num nodes').onChange(updateNodesAndLinks);
+  gui.add(params, 'numLinks', 0, 20000).name('num links').onChange(updateNodesAndLinks);
   gui.add(params, 'numInterations', 1, 100).name('num iterations');
   gui.add(params, 'useWebWorker').name('use web worker').onChange(function() {
     if(params.useWebWorker) {
@@ -238,6 +238,7 @@ function createPixiGraphics() {
     // gfx.drawCircle(0, 0, NODE_RADIUS);
 
     const gfx = new PIXI.Sprite(texture);
+    gfx.anchor.set(0.5);
     gfx.interactive = true;
     gfx.buttonMode = true;
     gfx.dragging = false;
@@ -248,6 +249,8 @@ function createPixiGraphics() {
     gfx.on('pointermove', onDragMove);
     gfx.smoothFollowX = new SmoothFollow();
     gfx.smoothFollowY = new SmoothFollow();
+    gfx.smoothFollowX.set(width / 2);
+    gfx.smoothFollowY.set(height / 2);
 
     container.addChild(gfx);
     gfxIDMap[node.id] = gfx;
@@ -663,7 +666,8 @@ function drawLines() {
     const target = gfxIDMap[link.target.id || link.target];
 
     if(source && target) {
-      linksGfx.lineStyle(Math.sqrt(link.value), 0x999999);
+      // linksGfx.lineStyle(Math.sqrt(link.value), 0x999999);
+      linksGfx.lineStyle(1.0, 0x999999);
       linksGfx.moveTo(source.x, source.y);
       linksGfx.lineTo(target.x, target.y);
     }

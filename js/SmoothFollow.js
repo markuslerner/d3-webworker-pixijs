@@ -4,6 +4,7 @@ export default class SmoothFollow {
     this.mass = mass;
     this.value = value;
     this.valueSmooth = value;
+    this.pristine = true;
 
     return this;
   }
@@ -18,7 +19,12 @@ export default class SmoothFollow {
   }
 
   set(value) {
-    this.value = value;
+    if(this.pristine) {
+      this.pristine = false;
+      this.reset(value);
+    } else {
+      this.value = value;
+    }
   }
 
   get() {
