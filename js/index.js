@@ -1,4 +1,4 @@
-// Based on:
+// Roughly based on:
 // https://bl.ocks.org/kirjavascript/dcafa2b3a53cbcc9c5de19b938b92119
 // https://observablehq.com/@zakjan/force-directed-graph-pixi
 
