@@ -119,17 +119,26 @@ const linksGfx = new PIXI.Graphics();
 linksGfx.alpha = 0.6;
 container.addChild(linksGfx);
 
-// app.ticker.add(() => {
-//   renderStats.end();
-//   renderStats.begin();
-// });
-//
-// app.ticker.add(updateInterpolatedPositions);
-//
-// app.ticker.add(updatePositionsFromMainThreadSimulation);
-//
-// app.ticker.add(drawLines);
+const colour = (function() {
+    const scale = d3.scaleOrdinal(d3.schemeCategory10);
+    return (num) => parseInt(scale(num).slice(1), 16);
+})();
 
+createGraph();
+init();
+
+// loadGraph();
+
+function init() {
+  createPixiGraphics();
+
+  createWebworker();
+
+  createMainThreadSimulation();
+
+  requestAnimationFrame(render);
+
+}
 
 function render() {
   renderStats.end();
@@ -145,48 +154,24 @@ function render() {
   requestAnimationFrame(render);
 }
 
-requestAnimationFrame(render);
+function loadGraph() {
+  // load graph:
+  d3.json("https://gist.githubusercontent.com/mbostock/4062045/raw/5916d145c8c048a6e3086915a6be464467391c62/miserables.json")
+  .then(json => {
+      graph = JSON.parse(JSON.stringify(json));
 
+      console.log('Original graph: ' + graph.nodes.length + ' nodes, ' + graph.links.length + ' links');
+      console.log(graph);
 
-const colour = (function() {
-    const scale = d3.scaleOrdinal(d3.schemeCategory10);
-    return (num) => parseInt(scale(num).slice(1), 16);
-})();
+      const h = 5;
+      const m = 1;
+      graph = hyper(multiply(graph, m), h);
+      console.log('multiply: ' + m + ', hyper: ' + h);
+      console.log(graph.nodes.length + ' nodes, ' + graph.links.length + ' links');
 
-// d3.json("https://gist.githubusercontent.com/mbostock/4062045/raw/5916d145c8c048a6e3086915a6be464467391c62/miserables.json")
-// .then(json => {
-//     graph = JSON.parse(JSON.stringify(json));
-//
-//     console.log('Original graph: ' + graph.nodes.length + ' nodes, ' + graph.links.length + ' links');
-//     console.log(graph);
-//
-//     const h = 5;
-//     const m = 1;
-//     graph = hyper(multiply(graph, m), h);
-//     console.log('multiply: ' + m + ', hyper: ' + h);
-//     console.log(graph.nodes.length + ' nodes, ' + graph.links.length + ' links');
-//
-//     createPixiGraphics();
-//
-//     createWebworker();
-//
-//     createMainThreadSimulation();
-//
-// });
+      init();
 
-
-
-init();
-
-function init() {
-  createGraph();
-
-  createPixiGraphics();
-
-  createWebworker();
-
-  createMainThreadSimulation();
-
+  });
 }
 
 function updateNodesAndLinks() {
