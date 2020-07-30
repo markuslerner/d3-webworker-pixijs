@@ -13,7 +13,6 @@ import { createRandomGraph, hyper, multiply } from './graph-utils.js';
 
 
 const FORCE_LAYOUT_NODE_REPULSION_STRENGTH = 20;
-const FORCE_LAYOUT_ITERATIONS = 1;
 const NODE_RADIUS = 5;
 const NODE_HIT_WIDTH = 5;
 const NODE_HIT_RADIUS = NODE_RADIUS + NODE_HIT_WIDTH;
@@ -27,6 +26,7 @@ const params = {
   drawLines: false,
   numNodes: 2000,
   numLinks: 4000,
+  numInterations: 5,
 };
 
 let gfxIDMap = {}; // store references to node graphics by node id
@@ -74,13 +74,14 @@ const gui = new GUI();
 // gui.close();
 
 gui.add(params, 'numNodes', 1, 10000).name('num nodes').onChange(updateNodesAndLinks);
-gui.add(params, 'numLinks', 1, 10000).name('num links').onChange(updateNodesAndLinks);
+gui.add(params, 'numLinks', 1, 100000).name('num links').onChange(updateNodesAndLinks);
+gui.add(params, 'numInterations', 1, 100).name('num iterations');
 gui.add(params, 'useWebWorker').name('use WebWorker').onChange(function() {
   if(params.useWebWorker) {
     updateNodesFromBuffer();
-    simulation.stop();
+    // simulation.stop();
   } else {
-    simulation.restart();
+    // simulation.restart();
   }
   workerStats.dom.style.display = params.useWebWorker ? 'block' : 'none';
 });
@@ -118,6 +119,8 @@ app.ticker.add(() => {
 });
 
 app.ticker.add(updateInterpolatedPositions);
+
+app.ticker.add(updatePositionsFromMainThreadSimulation);
 
 app.ticker.add(drawLines);
 
@@ -335,7 +338,7 @@ function createWorkerSimulation() {
         alpha: ALPHA,
         alphaDecay: ALPHA_DECAY,
         alphaTarget: ALPHA_TARGET,
-        iterations: FORCE_LAYOUT_ITERATIONS,
+        iterations: params.numInterations,
         nodeRepulsionStrength: FORCE_LAYOUT_NODE_REPULSION_STRENGTH,
         width,
         height,
@@ -352,7 +355,7 @@ function updateWorkerBuffers() {
   worker.postMessage({
     type: 'updateWorkerBuffers',
     options: {
-      iterations: FORCE_LAYOUT_ITERATIONS,
+      iterations: params.numInterations,
       nodeRepulsionStrength: FORCE_LAYOUT_NODE_REPULSION_STRENGTH,
       width,
       height,
@@ -401,9 +404,9 @@ function updateMainThreadSimulation() {
   simulation
     .force("charge", d3.forceManyBody().strength(-FORCE_LAYOUT_NODE_REPULSION_STRENGTH))
     .force('center', d3.forceCenter(width / 2, height / 2))
-    .tick(FORCE_LAYOUT_ITERATIONS)
-    .on('tick', updatePositionsFromMainThreadSimulation)
-    // .stop()
+    // .tick(FORCE_LAYOUT_ITERATIONS)
+    // .on('tick', updatePositionsFromMainThreadSimulation)
+    .stop()
     ;
 
 }
@@ -469,6 +472,8 @@ function updatePositionsFromMainThreadSimulation() { // only when not using web 
   if(params.useWebWorker) return;
 
   if(graph) {
+    simulation.tick(params.numInterations);
+
     graph.nodes.forEach((node) => {
         let { x, y } = node;
         const gfx = gfxMap.get(node);
