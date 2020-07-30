@@ -17,8 +17,8 @@ const NODE_RADIUS = 2.5;
 const NODE_HIT_WIDTH = 5.0;
 const NODE_HIT_RADIUS = NODE_RADIUS + NODE_HIT_WIDTH;
 const ALPHA = 0.5;
-const ALPHA_DECAY = 0.005;
-const ALPHA_TARGET = 0.1;
+const ALPHA_DECAY = 0.01;
+const ALPHA_TARGET = 0.05;
 
 const params = {
   useWebWorker: true,
@@ -258,8 +258,8 @@ function createPixiGraphics() {
 function createWebworker() {
   // console.log('Create web worker');
 
-  nodesBuffer = new Float32Array(graph.nodes.length * 2);
-  // nodesBuffer = new Float32Array(new SharedArrayBuffer(graph.nodes.length * 2 * 4));
+  nodesBuffer = new Float32Array(graph.nodes.length * 2); // transferable object
+  // nodesBuffer = new Float32Array(new SharedArrayBuffer(graph.nodes.length * 2 * 4)); // SharedArrayBuffer
 
   const workerCode = `
     importScripts('https://unpkg.com/d3@5.12.0/dist/d3.min.js');
