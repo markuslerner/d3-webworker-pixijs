@@ -42,6 +42,7 @@ let delta = 1 / 60;
 let width = window.innerWidth;
 let height = window.innerHeight;
 let nodesBuffer;
+// let sharedBuffer, sharedArray;
 let draggingNode;
 let renderStats, workerStats;
 
@@ -259,7 +260,10 @@ function createWebworker() {
   // console.log('Create web worker');
 
   nodesBuffer = new Float32Array(graph.nodes.length * 2); // transferable object
-  // nodesBuffer = new Float32Array(new SharedArrayBuffer(graph.nodes.length * 2 * 4)); // SharedArrayBuffer
+
+  // const size = Int32Array.BYTES_PER_ELEMENT * graph.nodes.length * 2;
+  // sharedBuffer = new SharedArrayBuffer(size);
+  // sharedArray = new Int32Array(sharedBuffer);
 
   const workerCode = `
     importScripts('https://unpkg.com/d3@5.12.0/dist/d3.min.js');
@@ -277,6 +281,17 @@ function createWebworker() {
 
       postMessage({ type: 'updateMainBuffers', nodesBuffer }, [nodesBuffer.buffer]);
     }
+
+    // function copyDataToSharedBuffer(sharedBuffer) {
+    //   const sharedArray = new Int32Array(sharedBuffer);
+    //   for(var i = 0; i < graph.nodes.length; i++){
+    //       var node = graph.nodes[i];
+    //       sharedArray[i * 2 + 0] = node.x;
+    //       sharedArray[i * 2 + 1] = node.y;
+    //   }
+    //
+    //   postMessage({ type: 'updateMainSharedBuffer', sharedBuffer });
+    // }
 
     self.onmessage = event => {
       // console.log('event.data', event.data);
@@ -308,6 +323,7 @@ function createWebworker() {
         }
 
         copyDataToBuffers(event.data.nodesBuffer);
+        // copyDataToSharedBuffer(event.data.sharedBuffer);
 
       } else if(type === 'updateWorkerGraph') {
         graph = event.data.graph;
@@ -337,6 +353,18 @@ function createWebworker() {
 
         copyDataToBuffers(event.data.nodesBuffer);
 
+      // } else if(type === 'updateWorkerSharedBuffer') {
+      //   if(simulation) {
+      //     const { iterations, width, height } = options;
+      //
+      //     simulation
+      //       .force('center', d3.forceCenter(width / 2, height / 2))
+      //       .tick(iterations)
+      //       ;
+      //   }
+      //
+      //   copyDataToSharedBuffer(event.data.sharedBuffer);
+
       }
 
     }
@@ -359,6 +387,9 @@ function createWebworker() {
       // graph = event.data;
 
       updateNodesFromBuffer();
+
+    // } else if(type === 'updateMainSharedBuffer') {
+    //   updateNodesFromSharedBuffer();
 
     }
 
@@ -403,6 +434,23 @@ function updateWorkerBuffers() {
   }, [nodesBuffer.buffer]);
 
 }
+
+// function updateWorkerSharedBuffer() {
+//   if(!params.useWebWorker || params.pauseSimulation) return;
+//
+//   sendTime = Date.now();
+//   worker.postMessage({
+//     type: 'updateWorkerSharedBuffer',
+//     options: {
+//       iterations: params.numInterations,
+//       nodeRepulsionStrength: FORCE_LAYOUT_NODE_REPULSION_STRENGTH,
+//       width,
+//       height,
+//     },
+//     sharedBuffer,
+//   });
+//
+// }
 
 function updateWorkerGraph() {
   worker.postMessage({
@@ -505,6 +553,38 @@ function updateNodesFromBuffer() {
   workerStats.begin();
 
 }
+
+// function updateNodesFromSharedBuffer() {
+//   // Update nodes from buffer
+//   for(var i = 0; i < graph.nodes.length; i++) {
+//     const node = graph.nodes[i];
+//     if(draggingNode !== node) {
+//       // const gfx = gfxMap.get(node);
+//       const gfx = gfxIDMap[node.id];
+//       // gfx.position = new PIXI.Point(x, y);
+//
+//       if(params.interpolatePositions) {
+//         gfx.smoothFollowX.set(node.x = Atomics.load(sharedArray, i * 2 + 0));
+//         gfx.smoothFollowY.set(node.y = Atomics.load(sharedArray, i * 2 + 1));
+//       } else {
+//         gfx.position.x = node.x = Atomics.load(sharedArray, i * 2 + 0);
+//         gfx.position.y = node.y = Atomics.load(sharedArray, i * 2 + 1);
+//       }
+//
+//     }
+//   }
+//
+//   // If the worker was faster than the time step (dt seconds), we want to delay the next timestep
+//   let delay = delta * 1000 - (Date.now() - sendTime);
+//   if(delay < 0) {
+//       delay = 0;
+//   }
+//   setTimeout(updateWorkerSharedBuffer, delay);
+//
+//   workerStats.end();
+//   workerStats.begin();
+//
+// }
 
 function updatePositionsFromMainThreadSimulation() { // only when not using web worker
   // stats.begin();
