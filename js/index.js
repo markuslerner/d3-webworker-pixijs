@@ -98,16 +98,17 @@ const app = new PIXI.Application({
   autoDensity: true,
 });
 document.body.appendChild(app.view);
+const { renderer, stage } = app;
 
 window.addEventListener("resize", function() {
   width = window.innerWidth;
   height = window.innerHeight;
-  app.renderer.resize(width, height);
+  renderer.resize(width, height);
   updateMainThreadSimulation();
 });
 
 const container = new PIXI.Container();
-app.stage.addChild(container);
+stage.addChild(container);
 
 const linksGfx = new PIXI.Graphics();
 linksGfx.alpha = 0.6;
@@ -201,7 +202,7 @@ function createPixiGraphics() {
   graphics.drawCircle(0, 0, NODE_RADIUS);
   graphics.position.x = NODE_RADIUS + 1.0;
   graphics.position.y = NODE_RADIUS + 1.0;
-  app.renderer.render(graphics, texture);
+  renderer.render(graphics, texture);
 
   graph.nodes.forEach((node) => {
     // const gfx = new PIXI.Graphics();
