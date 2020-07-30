@@ -88,17 +88,22 @@ gui.add(params, 'useWebWorker').name('use WebWorker').onChange(function() {
 gui.add(params, 'interpolatePositions').name('interpolate');
 gui.add(params, 'drawLines').name('draw lines');
 
-const app = new PIXI.Application({
-  width,
-  height,
-  antialias: true,
-  backgroundColor: 0x000000,
-  resolution: window.devicePixelRatio || 1,
-  autoStart: true,
-  autoDensity: true,
-});
-document.body.appendChild(app.view);
-const { renderer, stage } = app;
+// const app = new PIXI.Application({
+//   width,
+//   height,
+//   antialias: true,
+//   backgroundColor: 0x000000,
+//   resolution: window.devicePixelRatio || 1,
+//   autoStart: true,
+//   autoDensity: true,
+// });
+// document.body.appendChild(app.view);
+// const { renderer, stage } = app;
+
+// Renderer seems to be faster than using PIXI.Application:
+var renderer = PIXI.autoDetectRenderer({ antialias: true, width, height, backgroundColor: 0x000000 });
+document.body.appendChild(renderer.view);
+const stage = new PIXI.Container();
 
 window.addEventListener("resize", function() {
   width = window.innerWidth;
@@ -114,16 +119,34 @@ const linksGfx = new PIXI.Graphics();
 linksGfx.alpha = 0.6;
 container.addChild(linksGfx);
 
-app.ticker.add(() => {
+// app.ticker.add(() => {
+//   renderStats.end();
+//   renderStats.begin();
+// });
+//
+// app.ticker.add(updateInterpolatedPositions);
+//
+// app.ticker.add(updatePositionsFromMainThreadSimulation);
+//
+// app.ticker.add(drawLines);
+
+
+function render() {
   renderStats.end();
+
+  updateInterpolatedPositions();
+  updatePositionsFromMainThreadSimulation();
+  drawLines();
+
+  renderer.render(stage);
+
   renderStats.begin();
-});
 
-app.ticker.add(updateInterpolatedPositions);
+  requestAnimationFrame(render);
+}
 
-app.ticker.add(updatePositionsFromMainThreadSimulation);
+requestAnimationFrame(render);
 
-app.ticker.add(drawLines);
 
 const colour = (function() {
     const scale = d3.scaleOrdinal(d3.schemeCategory10);
