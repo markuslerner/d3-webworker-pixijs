@@ -27,6 +27,7 @@ const params = {
   numNodes: 5000,
   numLinks: 5000,
   numInterations: 1,
+  pauseSimulation: false,
 };
 
 let renderer, stage, container, linksGfx;
@@ -88,7 +89,7 @@ function createGUI() {
   gui.add(params, 'numNodes', 1, 10000).name('num nodes').onChange(updateNodesAndLinks);
   gui.add(params, 'numLinks', 1, 10000).name('num links').onChange(updateNodesAndLinks);
   gui.add(params, 'numInterations', 1, 100).name('num iterations');
-  gui.add(params, 'useWebWorker').name('use WebWorker').onChange(function() {
+  gui.add(params, 'useWebWorker').name('use web worker').onChange(function() {
     if(params.useWebWorker) {
       updateNodesFromBuffer();
       // simulation.stop();
@@ -97,8 +98,17 @@ function createGUI() {
     }
     workerStats.dom.style.display = params.useWebWorker ? 'block' : 'none';
   });
+  gui.add(params, 'pauseSimulation').name('pause simulation').onChange(function() {
+    if(!params.pauseSimulation && params.useWebWorker) {
+      updateNodesFromBuffer();
+    }
+
+    workerStats.dom.style.display = !params.pauseSimulation && params.useWebWorker ? 'block' : 'none';
+
+  });
   gui.add(params, 'interpolatePositions').name('interpolate');
   gui.add(params, 'drawLines').name('draw lines');
+
 }
 
 function createRenderer() {
@@ -378,7 +388,7 @@ function createWorkerSimulation() {
 }
 
 function updateWorkerBuffers() {
-  if(!params.useWebWorker) return;
+  if(!params.useWebWorker || params.pauseSimulation) return;
 
   sendTime = Date.now();
   worker.postMessage({
@@ -501,7 +511,9 @@ function updatePositionsFromMainThreadSimulation() { // only when not using web 
   if(params.useWebWorker) return;
 
   if(graph) {
-    simulation.tick(params.numInterations);
+    if(!params.pauseSimulation) {
+      simulation.tick(params.numInterations);
+    }
 
     graph.nodes.forEach((node) => {
         let { x, y } = node;
