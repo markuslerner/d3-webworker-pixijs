@@ -1,6 +1,5 @@
-// Taken from:
+// Partly taken from:
 // https://observablehq.com/@zakjan/graph-utils
-// http://bl.ocks.org/MNoichl/11c575aa09619aad70cb09d8801ad045
 
 
 
@@ -12,7 +11,6 @@ export const createRandomGraph = (numNodes, numLinks) => { //creates a random gr
       id: 'node' + n,
     }
   });
-  // var list  = randomChoose(unorderedPairs(d3.range(n)), m);
   // var links = list.map(function (a) { return {source: a[0], target: a[1]} });
   var links = [];
   if(nodes.length > 1) {
@@ -40,31 +38,8 @@ export function getRandomArrayElements(arr, numMax) {
   return shuffled.slice(min);
 };
 
-// const ids = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-// const ids = [1, 2, 3];
-// console.log(getRandomArrayElements(ids, 5));
-
-
 export function getRandomIndex(length) {
   return Math.round(Math.random() * (length - 1));
-};
-
-const randomChoose = (s, k) => { // returns a random k element subset of s
-  var a = [], i = -1, j;
-  while (++i < k) {
-    j = Math.floor(Math.random() * s.length);
-    a.push(s.splice(j, 1)[0]);
-  };
-  return a;
-};
-
-const unorderedPairs = (s) => { // returns the list of all unordered pairs from s
-  var i = -1, a = [], j;
-  while (++i < s.length) {
-    j = i;
-    while (++j < s.length) a.push([s[i],s[j]])
-  };
-  return a;
 };
 
 const range = n => new Array(n).fill(undefined).map((_, i) => i);

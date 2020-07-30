@@ -12,20 +12,21 @@ import { createRandomGraph, hyper, multiply } from './graph-utils.js';
 
 
 
-const FORCE_LAYOUT_NODE_REPULSION_STRENGTH = 10;
+const FORCE_LAYOUT_NODE_REPULSION_STRENGTH = 20;
 const FORCE_LAYOUT_ITERATIONS = 1;
-const MULTIPLY = 1;
-const HYPER = 5;
 const NODE_RADIUS = 5;
 const NODE_HIT_WIDTH = 5;
 const NODE_HIT_RADIUS = NODE_RADIUS + NODE_HIT_WIDTH;
+const ALPHA = 0.25;
+const ALPHA_DECAY = 0.005;
+const ALPHA_TARGET = 0.05;
 
 const params = {
   useWebWorker: true,
   interpolatePositions: true,
-  drawLines: true,
+  drawLines: false,
   numNodes: 2000,
-  numLinks: 2000,
+  numLinks: 4000,
 };
 
 let gfxIDMap = {}; // store references to node graphics by node id
@@ -101,6 +102,7 @@ window.addEventListener("resize", function() {
   width = window.innerWidth;
   height = window.innerHeight;
   app.renderer.resize(width, height);
+  updateMainThreadSimulation();
 });
 
 const container = new PIXI.Container();
@@ -131,8 +133,10 @@ const colour = (function() {
 //     console.log('Original graph: ' + graph.nodes.length + ' nodes, ' + graph.links.length + ' links');
 //     console.log(graph);
 //
-//     graph = hyper(multiply(graph, MULTIPLY), HYPER);
-//     console.log('multiply: ' + MULTIPLY + ', hyper: ' + HYPER);
+//     const h = 5;
+//     const m = 1;
+//     graph = hyper(multiply(graph, m), h);
+//     console.log('multiply: ' + m + ', hyper: ' + h);
 //     console.log(graph.nodes.length + ' nodes, ' + graph.links.length + ' links');
 //
 //     createPixiGraphics();
@@ -143,14 +147,20 @@ const colour = (function() {
 //
 // });
 
-createGraph();
 
-createPixiGraphics();
 
-createWebworker();
+init();
 
-createMainThreadSimulation();
+function init() {
+  createGraph();
 
+  createPixiGraphics();
+
+  createWebworker();
+
+  createMainThreadSimulation();
+
+}
 
 function updateNodesAndLinks() {
   graph.nodes.forEach(node => {
@@ -239,12 +249,17 @@ function createWebworker() {
 
       if(type === 'createSimulation') {
         if(!simulation) {
+          const { alpha, alphaDecay, alphaTarget, iterations, nodeRepulsionStrength, width, height } = options;
+
           simulation = d3.forceSimulation()
-            .alpha(0.25)
-            .alphaDecay(0.005)
-            .alphaTarget(0.025)
+            .alpha(alpha)
+            .alphaDecay(alphaDecay)
+            .alphaTarget(alphaTarget)
             .nodes(nodes)
             .force("link", d3.forceLink(links).id(d => d.id))
+            .force("charge", d3.forceManyBody().strength(-nodeRepulsionStrength))
+            .force('center', d3.forceCenter(width / 2, height / 2))
+            .tick(iterations)
             .stop()
             ;
 
@@ -270,10 +285,9 @@ function createWebworker() {
 
       } else if(type === 'updateWorkerBuffers') {
         if(simulation) {
-          const { iterations, nodeRepulsionStrength, width, height } = options;
+          const { iterations, width, height } = options;
 
           simulation
-            .force("charge", d3.forceManyBody().strength(-nodeRepulsionStrength))
             .force('center', d3.forceCenter(width / 2, height / 2))
             .tick(iterations)
             ;
@@ -318,6 +332,9 @@ function createWorkerSimulation() {
       type: 'createSimulation',
       graph,
       options: {
+        alpha: ALPHA,
+        alphaDecay: ALPHA_DECAY,
+        alphaTarget: ALPHA_TARGET,
         iterations: FORCE_LAYOUT_ITERATIONS,
         nodeRepulsionStrength: FORCE_LAYOUT_NODE_REPULSION_STRENGTH,
         width,
@@ -367,9 +384,9 @@ function createMainThreadSimulation() {
   simulation = d3.forceSimulation()
     .nodes(nodes)
     .force("link", d3.forceLink(links).id(d => d.id))
-    .alpha(0.25)
-    .alphaDecay(0.005)
-    .alphaTarget(0.025)
+    .alpha(ALPHA)
+    .alphaDecay(ALPHA_DECAY)
+    .alphaTarget(ALPHA_TARGET)
     ;
 
   if(params.useWebWorker) simulation.stop();
