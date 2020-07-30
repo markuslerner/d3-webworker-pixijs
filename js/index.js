@@ -87,8 +87,8 @@ function createGUI() {
   const gui = new GUI();
   // gui.close();
 
-  gui.add(params, 'numNodes', 1, 10000).name('num nodes').onChange(updateNodesAndLinks);
-  gui.add(params, 'numLinks', 1, 10000).name('num links').onChange(updateNodesAndLinks);
+  gui.add(params, 'numNodes', 1, 50000).name('num nodes').onChange(updateNodesAndLinks);
+  gui.add(params, 'numLinks', 1, 50000).name('num links').onChange(updateNodesAndLinks);
   gui.add(params, 'numInterations', 1, 100).name('num iterations');
   gui.add(params, 'useWebWorker').name('use web worker').onChange(function() {
     if(params.useWebWorker) {
