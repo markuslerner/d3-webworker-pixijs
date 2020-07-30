@@ -12,11 +12,32 @@
           body {
             margin: 0;
             overflow: hidden;
+            font-family: Helvetica, Arial, sans-serif;
+            color: #fff;
           }
 
-          .title {
+          #title {
+            position: absolute;
+            left: 40px;
+            top: 25px;
+          }
+
+          h1 {
+            font-weight: 300; font-size: 24px; margin-bottom: .5em;
+          }
+
+          #info {
+            z-index: 1;
+            position: absolute;
+            left: 120px;
+            bottom: 30px;
+          }
+
+          a {
             color: #fff;
-            font-family: Helvetica, Arial, sans-serif;
+          }
+
+          .stats-title {
             font-size: 9px;
             font-weight: bold;
             padding: 2px 3px;
@@ -31,5 +52,12 @@
         <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/5.3.0/pixi.min.js"></script>
 
         <script src="js/index.js" type="module"></script>
+
+        <div id="title">
+    			<h1>d3 - web worker - pixi.js</h1>
+    			<p></p>
+    		</div>
+
+        <div id="info"><a href="https://github.com/markuslerner/d3-webworker-pixijs" target="_blank" rel="noopener">Source</a></div>
     </body>
 </html>

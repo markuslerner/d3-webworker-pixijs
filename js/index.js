@@ -61,7 +61,7 @@ function createStats() {
   renderStats = new Stats();
   document.body.appendChild(renderStats.dom);
   var title = document.createElement("div");
-  title.className = 'title';
+  title.className = 'stats-title';
   title.appendChild(document.createTextNode("Renderer"));
   renderStats.dom.insertBefore(title, renderStats.dom.childNodes[0]);
   renderStats.dom.style.left = '0px';
@@ -73,7 +73,7 @@ function createStats() {
   document.body.appendChild( workerStats.dom );
   var title = document.createElement("div");
   title.appendChild(document.createTextNode("Worker"));
-  title.className = 'title';
+  title.className = 'stats-title';
   workerStats.dom.insertBefore(title, workerStats.dom.childNodes[0]);
   workerStats.dom.style.left = 'auto';
   workerStats.dom.style.right = '0px';
