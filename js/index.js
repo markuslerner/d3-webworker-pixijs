@@ -12,9 +12,9 @@ import { createRandomGraph, colour, hyper, multiply } from './graph-utils.js';
 
 
 
-const FORCE_LAYOUT_NODE_REPULSION_STRENGTH = 10;
-const NODE_RADIUS = 3;
-const NODE_HIT_WIDTH = 10;
+const FORCE_LAYOUT_NODE_REPULSION_STRENGTH = 5;
+const NODE_RADIUS = 2.5;
+const NODE_HIT_WIDTH = 5.0;
 const NODE_HIT_RADIUS = NODE_RADIUS + NODE_HIT_WIDTH;
 const ALPHA = 0.5;
 const ALPHA_DECAY = 0.005;
@@ -24,9 +24,9 @@ const params = {
   useWebWorker: true,
   interpolatePositions: true,
   drawLines: false,
-  numNodes: 2000,
-  numLinks: 4000,
-  numInterations: 5,
+  numNodes: 5000,
+  numLinks: 5000,
+  numInterations: 1,
 };
 
 let renderer, stage, container, linksGfx;
@@ -86,7 +86,7 @@ function createGUI() {
   // gui.close();
 
   gui.add(params, 'numNodes', 1, 10000).name('num nodes').onChange(updateNodesAndLinks);
-  gui.add(params, 'numLinks', 1, 100000).name('num links').onChange(updateNodesAndLinks);
+  gui.add(params, 'numLinks', 1, 10000).name('num links').onChange(updateNodesAndLinks);
   gui.add(params, 'numInterations', 1, 100).name('num iterations');
   gui.add(params, 'useWebWorker').name('use WebWorker').onChange(function() {
     if(params.useWebWorker) {
@@ -115,7 +115,7 @@ function createRenderer() {
   // const { renderer, stage } = app;
 
   // Renderer seems to be faster than using PIXI.Application:
-  renderer = PIXI.autoDetectRenderer({ antialias: true, width, height, backgroundColor: 0x000000 });
+  renderer = PIXI.autoDetectRenderer({ autoDensity: true, antialias: true, width, height, backgroundColor: 0x000000, resolution: window.devicePixelRatio || 1 });
   document.body.appendChild(renderer.view);
   stage = new PIXI.Container();
 
@@ -160,25 +160,25 @@ function render() {
   requestAnimationFrame(render);
 }
 
-function loadGraph() {
-  // load graph:
-  d3.json("https://gist.githubusercontent.com/mbostock/4062045/raw/5916d145c8c048a6e3086915a6be464467391c62/miserables.json")
-  .then(json => {
-      graph = JSON.parse(JSON.stringify(json));
-
-      console.log('Original graph: ' + graph.nodes.length + ' nodes, ' + graph.links.length + ' links');
-      console.log(graph);
-
-      const h = 5;
-      const m = 1;
-      graph = hyper(multiply(graph, m), h);
-      console.log('multiply: ' + m + ', hyper: ' + h);
-      console.log(graph.nodes.length + ' nodes, ' + graph.links.length + ' links');
-
-      init();
-
-  });
-}
+// function loadGraph() {
+//   // load graph:
+//   d3.json("https://gist.githubusercontent.com/mbostock/4062045/raw/5916d145c8c048a6e3086915a6be464467391c62/miserables.json")
+//   .then(json => {
+//       graph = JSON.parse(JSON.stringify(json));
+//
+//       console.log('Original graph: ' + graph.nodes.length + ' nodes, ' + graph.links.length + ' links');
+//       console.log(graph);
+//
+//       const h = 5;
+//       const m = 1;
+//       graph = hyper(multiply(graph, m), h);
+//       console.log('multiply: ' + m + ', hyper: ' + h);
+//       console.log(graph.nodes.length + ' nodes, ' + graph.links.length + ' links');
+//
+//       init();
+//
+//   });
+// }
 
 function updateNodesAndLinks() {
   graph.nodes.forEach(node => {
@@ -208,19 +208,21 @@ function createGraph() {
 }
 
 function createPixiGraphics() {
-  const brt = new PIXI.BaseRenderTexture(NODE_RADIUS * 2 + 2.0, NODE_RADIUS * 2 + 2.0, PIXI.SCALE_MODES.LINEAR, window.devicePixelRatio);
+  // Create pre-rendered texture to improve performance (about double):
+  const brt = new PIXI.BaseRenderTexture((NODE_RADIUS * 2 + 2.0), (NODE_RADIUS * 2 + 2.0), PIXI.SCALE_MODES.LINEAR, window.devicePixelRatio);
   const texture = new PIXI.RenderTexture(brt);
   const graphics = new PIXI.Graphics();
   graphics.lineStyle(1.0, 0x000000);
   graphics.beginFill(0xFFFFFF);
   graphics.drawCircle(0, 0, NODE_RADIUS);
-  graphics.position.x = NODE_RADIUS + 1.0;
-  graphics.position.y = NODE_RADIUS + 1.0;
+  graphics.position.x = (NODE_RADIUS + 1.0);
+  graphics.position.y = (NODE_RADIUS + 1.0);
+  // graphics.scale.x = graphics.scale.y = 1.0;
   renderer.render(graphics, texture);
 
   graph.nodes.forEach((node) => {
     // const gfx = new PIXI.Graphics();
-    // gfx.lineStyle(1.5, 0xFFFFFF);
+    // gfx.lineStyle(1, 0xFFFFFF);
     // gfx.beginFill(colour(node.group));
     // gfx.drawCircle(0, 0, NODE_RADIUS);
 
