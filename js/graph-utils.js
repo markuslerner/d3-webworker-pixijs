@@ -44,6 +44,11 @@ export function getRandomIndex(length) {
 
 const range = n => new Array(n).fill(undefined).map((_, i) => i);
 
+export const colour = (function() {
+    const scale = d3.scaleOrdinal(d3.schemeCategory10);
+    return (num) => parseInt(scale(num).slice(1), 16);
+})();
+
 export const multiply = (graph, n = 1) => {
   if (n === 0) {
     return empty();

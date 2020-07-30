@@ -8,7 +8,7 @@ import {GUI} from 'https://unpkg.com/dat.gui@0.7.7/build/dat.gui.module.js';
 
 import SmoothFollow from './SmoothFollow.js';
 
-import { createRandomGraph, hyper, multiply } from './graph-utils.js';
+import { createRandomGraph, colour, hyper, multiply } from './graph-utils.js';
 
 
 
@@ -29,10 +29,10 @@ const params = {
   numInterations: 5,
 };
 
+let renderer, stage, container, linksGfx;
 let gfxIDMap = {}; // store references to node graphics by node id
 let gfxMap = new WeakMap(); // store references to node graphics by node
 let nodeMap = new WeakMap(); // store references to nodes by node graphics
-
 let graph;
 let simulation; // simulation when not using web worker
 let worker; // web worker
@@ -42,92 +42,98 @@ let width = window.innerWidth;
 let height = window.innerHeight;
 let nodesBuffer;
 let draggingNode;
-let workerStats;
+let renderStats, workerStats;
 
-// var node = document.createElement("div");
-// node.appendChild( document.createTextNode("Water") );
+createStats();
 
-const renderStats = new Stats();
-document.body.appendChild(renderStats.dom);
-var title = document.createElement("div");
-title.className = 'title';
-title.appendChild(document.createTextNode("Renderer"));
-renderStats.dom.insertBefore(title, renderStats.dom.childNodes[0]);
-renderStats.dom.style.left = '0px';
-renderStats.dom.style.right = 'auto';
-renderStats.dom.style.top = 'auto';
-renderStats.dom.style.bottom = '0px';
+createGUI();
 
-workerStats = new Stats();
-document.body.appendChild( workerStats.dom );
-var title = document.createElement("div");
-title.appendChild(document.createTextNode("Worker"));
-title.className = 'title';
-workerStats.dom.insertBefore(title, workerStats.dom.childNodes[0]);
-workerStats.dom.style.left = 'auto';
-workerStats.dom.style.right = '0px';
-workerStats.dom.style.top = 'auto';
-workerStats.dom.style.bottom = '0px';
-workerStats.dom.style.display = params.useWebWorker ? 'block' : 'none';
-
-const gui = new GUI();
-// gui.close();
-
-gui.add(params, 'numNodes', 1, 10000).name('num nodes').onChange(updateNodesAndLinks);
-gui.add(params, 'numLinks', 1, 100000).name('num links').onChange(updateNodesAndLinks);
-gui.add(params, 'numInterations', 1, 100).name('num iterations');
-gui.add(params, 'useWebWorker').name('use WebWorker').onChange(function() {
-  if(params.useWebWorker) {
-    updateNodesFromBuffer();
-    // simulation.stop();
-  } else {
-    // simulation.restart();
-  }
-  workerStats.dom.style.display = params.useWebWorker ? 'block' : 'none';
-});
-gui.add(params, 'interpolatePositions').name('interpolate');
-gui.add(params, 'drawLines').name('draw lines');
-
-// const app = new PIXI.Application({
-//   width,
-//   height,
-//   antialias: true,
-//   backgroundColor: 0x000000,
-//   resolution: window.devicePixelRatio || 1,
-//   autoStart: true,
-//   autoDensity: true,
-// });
-// document.body.appendChild(app.view);
-// const { renderer, stage } = app;
-
-// Renderer seems to be faster than using PIXI.Application:
-var renderer = PIXI.autoDetectRenderer({ antialias: true, width, height, backgroundColor: 0x000000 });
-document.body.appendChild(renderer.view);
-const stage = new PIXI.Container();
-
-window.addEventListener("resize", function() {
-  width = window.innerWidth;
-  height = window.innerHeight;
-  renderer.resize(width, height);
-  updateMainThreadSimulation();
-});
-
-const container = new PIXI.Container();
-stage.addChild(container);
-
-const linksGfx = new PIXI.Graphics();
-linksGfx.alpha = 0.6;
-container.addChild(linksGfx);
-
-const colour = (function() {
-    const scale = d3.scaleOrdinal(d3.schemeCategory10);
-    return (num) => parseInt(scale(num).slice(1), 16);
-})();
+createRenderer();
 
 createGraph();
 init();
 
 // loadGraph();
+
+function createStats() {
+  renderStats = new Stats();
+  document.body.appendChild(renderStats.dom);
+  var title = document.createElement("div");
+  title.className = 'title';
+  title.appendChild(document.createTextNode("Renderer"));
+  renderStats.dom.insertBefore(title, renderStats.dom.childNodes[0]);
+  renderStats.dom.style.left = '0px';
+  renderStats.dom.style.right = 'auto';
+  renderStats.dom.style.top = 'auto';
+  renderStats.dom.style.bottom = '0px';
+
+  workerStats = new Stats();
+  document.body.appendChild( workerStats.dom );
+  var title = document.createElement("div");
+  title.appendChild(document.createTextNode("Worker"));
+  title.className = 'title';
+  workerStats.dom.insertBefore(title, workerStats.dom.childNodes[0]);
+  workerStats.dom.style.left = 'auto';
+  workerStats.dom.style.right = '0px';
+  workerStats.dom.style.top = 'auto';
+  workerStats.dom.style.bottom = '0px';
+  workerStats.dom.style.display = params.useWebWorker ? 'block' : 'none';
+
+}
+
+function createGUI() {
+  const gui = new GUI();
+  // gui.close();
+
+  gui.add(params, 'numNodes', 1, 10000).name('num nodes').onChange(updateNodesAndLinks);
+  gui.add(params, 'numLinks', 1, 100000).name('num links').onChange(updateNodesAndLinks);
+  gui.add(params, 'numInterations', 1, 100).name('num iterations');
+  gui.add(params, 'useWebWorker').name('use WebWorker').onChange(function() {
+    if(params.useWebWorker) {
+      updateNodesFromBuffer();
+      // simulation.stop();
+    } else {
+      // simulation.restart();
+    }
+    workerStats.dom.style.display = params.useWebWorker ? 'block' : 'none';
+  });
+  gui.add(params, 'interpolatePositions').name('interpolate');
+  gui.add(params, 'drawLines').name('draw lines');
+}
+
+function createRenderer() {
+  // const app = new PIXI.Application({
+  //   width,
+  //   height,
+  //   antialias: true,
+  //   backgroundColor: 0x000000,
+  //   resolution: window.devicePixelRatio || 1,
+  //   autoStart: true,
+  //   autoDensity: true,
+  // });
+  // document.body.appendChild(app.view);
+  // const { renderer, stage } = app;
+
+  // Renderer seems to be faster than using PIXI.Application:
+  renderer = PIXI.autoDetectRenderer({ antialias: true, width, height, backgroundColor: 0x000000 });
+  document.body.appendChild(renderer.view);
+  stage = new PIXI.Container();
+
+  window.addEventListener("resize", function() {
+    width = window.innerWidth;
+    height = window.innerHeight;
+    renderer.resize(width, height);
+    updateMainThreadSimulation();
+  });
+
+  container = new PIXI.Container();
+  stage.addChild(container);
+
+  linksGfx = new PIXI.Graphics();
+  linksGfx.alpha = 0.6;
+  container.addChild(linksGfx);
+
+}
 
 function init() {
   createPixiGraphics();
