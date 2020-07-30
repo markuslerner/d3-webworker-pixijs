@@ -12,13 +12,13 @@ import { createRandomGraph, hyper, multiply } from './graph-utils.js';
 
 
 
-const FORCE_LAYOUT_NODE_REPULSION_STRENGTH = 20;
-const NODE_RADIUS = 5;
-const NODE_HIT_WIDTH = 5;
+const FORCE_LAYOUT_NODE_REPULSION_STRENGTH = 10;
+const NODE_RADIUS = 3;
+const NODE_HIT_WIDTH = 10;
 const NODE_HIT_RADIUS = NODE_RADIUS + NODE_HIT_WIDTH;
-const ALPHA = 0.25;
+const ALPHA = 0.5;
 const ALPHA_DECAY = 0.005;
-const ALPHA_TARGET = 0.05;
+const ALPHA_TARGET = 0.1;
 
 const params = {
   useWebWorker: true,
@@ -193,11 +193,23 @@ function createGraph() {
 }
 
 function createPixiGraphics() {
+  const brt = new PIXI.BaseRenderTexture(NODE_RADIUS * 2 + 2.0, NODE_RADIUS * 2 + 2.0, PIXI.SCALE_MODES.LINEAR, window.devicePixelRatio);
+  const texture = new PIXI.RenderTexture(brt);
+  const graphics = new PIXI.Graphics();
+  graphics.lineStyle(1.0, 0x000000);
+  graphics.beginFill(0xFFFFFF);
+  graphics.drawCircle(0, 0, NODE_RADIUS);
+  graphics.position.x = NODE_RADIUS + 1.0;
+  graphics.position.y = NODE_RADIUS + 1.0;
+  app.renderer.render(graphics, texture);
+
   graph.nodes.forEach((node) => {
-    const gfx = new PIXI.Graphics();
-    gfx.lineStyle(1.5, 0xFFFFFF);
-    gfx.beginFill(colour(node.group));
-    gfx.drawCircle(0, 0, NODE_RADIUS);
+    // const gfx = new PIXI.Graphics();
+    // gfx.lineStyle(1.5, 0xFFFFFF);
+    // gfx.beginFill(colour(node.group));
+    // gfx.drawCircle(0, 0, NODE_RADIUS);
+
+    const gfx = new PIXI.Sprite(texture);
     gfx.interactive = true;
     gfx.buttonMode = true;
     gfx.dragging = false;
