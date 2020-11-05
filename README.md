@@ -6,7 +6,7 @@ Experiment running [D3 force directed graph](https://github.com/d3/d3-force) sim
 The CPU-intensive simulation runs entirely in the web worker at a lower framerate while the main rendering thread can run independently. The nodes positions are then copied to the main thread and interpolated at each frame so that the movement looks smooth.
 
 
-[Demo](https://www.markuslerner.com/github/d3-webworker-pixijs/index.html)
+[Demo](https://dev.markuslerner.com/d3-webworker-pixijs/index.html)
 
 
 
